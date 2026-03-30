@@ -1,15 +1,24 @@
 function renderReadingTime(article) {
   // If we weren't provided an article, we don't need to render anything.
   if (!article) {
-    return;
+	return;
   }
 
+  // get all text in article
   const text = article.textContent;
+
+  // divied up text into words
   const wordMatchRegExp = /[^\s]+/g; // Regular expression
   const words = text.matchAll(wordMatchRegExp);
+
   // matchAll returns an iterator, convert to array to get word count
+  // get length of array aka word count in article
   const wordCount = [...words].length;
+
+  // dividing total word count by average reading time of 200 words per min and rounding to nearest whole number to get reading time
   const readingTime = Math.round(wordCount / 200);
+
+  // create a badge element to show reading time info
   const badge = document.createElement("p");
   // Use the same styling as the publish information in an article's header
   badge.classList.add("color-secondary-text", "type--caption");
