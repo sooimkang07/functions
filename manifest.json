@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"name": "Functions",
+	"name": "Notate",
 	"description": "Annotate webpage elements with notes",
 	"version": "1.0",
 	"permissions": [
@@ -8,7 +8,7 @@
 	],
 	"action": {
 		"default_popup": "index.html",
-		"default_title": "Functions"
+		"default_title": "Notate"
 	},
 	"content_scripts": [
 		{
