@@ -64,6 +64,9 @@
 
 // END OF ERIC'S DEMO
 // ______________________________________________________________________________________
+let activeTarget = null
+let modal
+let textarea
 
 let isAnnotating = false
 
@@ -104,12 +107,66 @@ const exitAnnotating = () => {
 	removeBadge()
 }
 
+// I want to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
 const onKeydown = (event) => {
 	if (event.key !== 'Escape') return
 	if (!isAnnotating) return
 
 	exitAnnotating()
 }
+
+// Create modal 
+const createModal = () => {
+	if (modal) return
+
+	modal = document.createElement('dialog')
+	modal.id = 'notate-modal'
+
+	modal.innerHTML = `
+		<form method="dialog">
+			<label for="annotation-text">Notate</label>
+			<textarea id="annotation-text" name="annotation-text"></textarea>
+			<menu>
+				<li>
+					<button type="submit" value="cancel">Cancel</button>
+				</li>
+				<li>
+					<button type="submit" value="save">Save</button>
+				</li>
+			</menu>
+		</form>
+	`
+	// so that the modal is part of the page and can be interacted with, instead of just being created in the background and not showing up
+	document.body.append(modal)
+
+	textarea = modal.querySelector('textarea')
+}
+
+const onPageClick = (event) => {
+	if (!isAnnotating) return
+	// if the modal is already open, do nothing
+	if (modal?.open) return
+
+	const clickedInsideModal = event.target.closest('#notate-modal')
+	if (clickedInsideModal) return
+
+	const clickedBadge = event.target.closest('#notate-badge')
+	if (clickedBadge) return
+
+    // stop normal clicking behavior from page while annotating to not compete
+	event.preventDefault()
+	event.stopPropagation()
+
+	activeTarget = event.target
+
+	createModal()
+
+	textarea.value = ''
+
+	modal.showModal()
+}
+
+document.addEventListener('click', onPageClick, true)
 
 chrome.runtime.onMessage.addListener((message) => {
 	const actions = {
