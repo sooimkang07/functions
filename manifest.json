@@ -1,27 +1,32 @@
 {
 	"manifest_version": 3,
-	"name": "Notate",
+	"name": "Functions",
+	"description": "Annotate webpage elements with notes",
 	"version": "1.0",
-	"description": "Annotate live webpages with sticky notes, highlights, and drawings to enhance communication and collaboration.",
+	"permissions": [
+		"activeTab"
+	],
+	"action": {
+		"default_popup": "index.html",
+		"default_title": "Functions"
+	},
+	"content_scripts": [
+		{
+			"matches": [
+				"<all_urls>"
+			],
+			"js": [
+				"scripts/webpage.js"
+			],
+			"css": [
+				"webpage.css"
+			]
+		}
+	],
 	"icons": {
 		"16": "images/icon-16.png",
 		"32": "images/icon-32.png",
 		"48": "images/icon-48.png",
 		"128": "images/icon-128.png"
-	},
-	"action": {
-		"default_popup": "index.html"
-	},
-	"permissions": [
-		"activeTab"
-	],
-	"content_scripts": [
-		{
-			"js": ["scripts/content.js"],
-			"css": ["style.css"],
-			"matches": [
-				"<all_urls>"
-			]
-		}
-	]
+	}
 }
