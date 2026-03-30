@@ -1,0 +1,8 @@
+:root {
+	--space: 1rem;
+	--note-size: 12rem;
+
+    --color-note: yellow;
+    --color-text: black;
+    --color-highlight: red;
+}
