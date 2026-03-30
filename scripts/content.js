@@ -77,3 +77,20 @@ const state = {
 	activeNoteId: null,
 	notes: []
 }
+
+let layer
+
+const createLayer = () => {
+	// use the existing layer if there is one so not repeating multiple layers on top
+	if (document.getElementById(layerId)) {
+		layer = document.getElementById(layerId)
+		return
+	}
+
+	// create the layer
+	layer = document.createElement('aside')
+	layer.id = layerId
+	// helps with screen readers to know it's an added annotation layer to existing page
+	layer.setAttribute('aria-label', 'Page annotations')
+	document.body.append(layer)
+}
