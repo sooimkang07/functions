@@ -2,19 +2,19 @@
 	--space: 1rem;
 	--note-size: 12rem;
 
-    --color-note: #FFE992;
-    --color-text: black;
-    --color-highlight: red;
+	--color-note: #FFE992;
+	--color-text: black;
+	--color-highlight: red;
 }
 
 .italicize {
-    transform: skew(-45deg);
+	transform: skew(-45deg);
 }
 
 #paragraph-counter {
-    position: fixed;
-    background-color: white;
-    padding: 24px;
-    inset-inline-start: 24px;
-    inset-block-start: 24px;
+	position: fixed;
+	background-color: white;
+	padding: 24px;
+	inset-inline-start: 24px;
+	inset-block-start: 24px;
 }
