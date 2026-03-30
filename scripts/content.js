@@ -34,4 +34,12 @@
 
 // renderReadingTime(document.querySelector("article"));
 
-console.log("is this on?")
+// checking if script is running on matches (all_urls) not just the dev site from before
+// console.log("is this on?")
+
+// testing inline styling of all p on every page
+let paras = document.querySelectorAll('p')
+// console.log(paras)
+paras.forEach(paragraph => {
+	paragraph.style.transform = 'skew(45deg)'
+ })
