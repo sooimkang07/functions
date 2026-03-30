@@ -1,3 +1,4 @@
+// ERIC'S DEMO: 
 // function renderReadingTime(article) {
 //   // If we weren't provided an article, we don't need to render anything.
 //   if (!article) {
@@ -50,12 +51,29 @@
 // 	paragraph.classList.add('italicize')
 // })
 
-let paras = document.querySelectorAll('p')
+// let paras = document.querySelectorAll('p')
 
-// how to write the ui html for your extension
-let container = `
-	<div id="paragraph-counter">
-		<p>You have ${paras.length} paragraphs on this page.</p>
-	</div>
-`
-document.body.insertAdjacentHTML('beforeend', container)
+// // how to write the ui html for your extension
+// let container = `
+// 	<div id="paragraph-counter">
+// 		<p>You have ${paras.length} paragraphs on this page.</p>
+// 	</div>
+// `
+// document.body.insertAdjacentHTML('beforeend', container)
+
+// END OF ERIC'S DEMO
+// ______________________________________________________________________________________
+
+// setup my variables
+const layerId = 'notate-layer'
+const modalId = 'notate-modal'
+// need to get the page's built-in info to use for saving notes even after leaving page and coming back
+const pageKey = `${window.location.hostname}${window.location.pathname}`
+
+const state = {
+	isAnnotating: false,
+	isVisible: true,
+	activeTarget: null,
+	activeNoteId: null,
+	notes: []
+}
