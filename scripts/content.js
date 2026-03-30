@@ -38,8 +38,24 @@
 // console.log("is this on?")
 
 // testing inline styling of all p on every page
+// let paras = document.querySelectorAll('p')
+// // console.log(paras)
+// paras.forEach(paragraph => {
+// 	paragraph.style.transform = 'skew(45deg)'
+//  })
+
+// styling all p elements by adding a class connected by our stylesheet css instead of inline styling so that it can be easily changed in the css file (for more complex styling later, want to keep as little js as possible)
+// let paras = document.querySelectorAll('p')
+// paras.forEach((paragraph) => {
+// 	paragraph.classList.add('italicize')
+// })
+
 let paras = document.querySelectorAll('p')
-// console.log(paras)
-paras.forEach(paragraph => {
-	paragraph.style.transform = 'skew(45deg)'
- })
+
+// how to write the ui html for your extension
+let container = `
+	<div id="paragraph-counter">
+		<p>You have ${paras.length} paragraphs on this page.</p>
+	</div>
+`
+document.body.insertAdjacentHTML('beforeend', container)
