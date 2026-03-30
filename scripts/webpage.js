@@ -67,16 +67,41 @@
 
 let isAnnotating = false
 
+// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
+let badge
+
+const createBadge = () => {
+	if (badge) return
+
+	badge = document.createElement('aside')
+	badge.id = 'notate-badge'
+	badge.textContent = 'Annotating'
+
+	document.body.append(badge)
+}
+
+const removeBadge = () => {
+	if (!badge) return
+
+	badge.remove()
+	badge = null
+}
+
 const toggleAnnotating = () => {
 	isAnnotating = !isAnnotating
 
 	document.documentElement.classList.toggle('is-annotating', isAnnotating)
+
+	if (isAnnotating) createBadge()
+	else removeBadge()
 }
 
 const exitAnnotating = () => {
 	isAnnotating = false
 
 	document.documentElement.classList.remove('is-annotating')
+
+	removeBadge()
 }
 
 const onKeydown = (event) => {
