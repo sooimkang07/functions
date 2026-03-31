@@ -112,7 +112,7 @@ html.is-annotating *:hover {
 	position: absolute;
 	inline-size: var(--note-inline-size);
 	padding: var(--space-sm);
-	background-color: var(--color-note);
+	background: var(--color-note);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-sm);
 	box-shadow: var(--shadow-sm);
@@ -120,4 +120,21 @@ html.is-annotating *:hover {
 	pointer-events: auto;
 	white-space: pre-wrap;
 	z-index: var(--note-z);
+
+	p {
+		margin: 0;
+		padding-inline-end: 1.5rem;
+	}
+
+	.notate-delete {
+		position: absolute;
+		inset-block-start: 0.25rem;
+		inset-inline-end: 0.25rem;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+		font: inherit;
+		line-height: 1;
+		padding: 0.25rem;
+	}
 }

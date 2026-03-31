@@ -166,7 +166,12 @@ const renderAnnotation = (annotation) => {
 	const note = document.createElement('aside')
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
-	note.textContent = annotation.text
+
+	note.innerHTML = `
+		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
+		<p>${annotation.text}</p>
+	`
+
 	note.style.insetBlockStart = `${position.top}px`
 	note.style.insetInlineStart = `${position.left}px`
 
@@ -288,6 +293,9 @@ const onPageClick = (event) => {
 	const clickedBadge = event.target.closest('#notate-badge')
 	if (clickedBadge) return
 
+	const clickedNote = event.target.closest('.notate-note')
+	if (clickedNote) return
+
 	event.preventDefault()
 	event.stopPropagation()
 
@@ -300,10 +308,36 @@ const onPageClick = (event) => {
 	modal.showModal()
 }
 
+const onLayerClick = (event) => {
+	const deleteButton = event.target.closest('.notate-delete')
+	if (!deleteButton) return
+
+	event.preventDefault()
+	event.stopPropagation()
+
+	const note = deleteButton.closest('.notate-note')
+	if (!note) return
+
+	deleteAnnotation(note.dataset.id)
+}
+
 const getAnnotationById = (id) => {
 	return annotations.find((annotation) => {
 		return annotation.id === id
 	})
+}
+
+const deleteAnnotation = (id) => {
+	annotations = annotations.filter((annotation) => {
+		return annotation.id !== id
+	})
+
+	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+
+	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	if (!note) return
+
+	note.remove()
 }
 
 const repositionAnnotations = () => {
@@ -324,6 +358,7 @@ const repositionAnnotations = () => {
 	})
 }
 
+document.addEventListener('click', onLayerClick, true)
 document.addEventListener('click', onPageClick, true)
 
 chrome.runtime.onMessage.addListener((message) => {
