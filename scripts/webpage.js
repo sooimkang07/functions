@@ -87,20 +87,34 @@ const createAnnotationId = () => {
 	return `annotation-${Date.now()}`
 }
 
-// so that the selector is unique to the element, I'm checking if it has an id first, then if it doesn't I check for its parent and its siblings to create a more specific selector.
+// so that the selector is more specific to the exact element, I'm checking if it has an id first,
+// and if it doesn't I'm building a parent > child path with nth-of-type so querySelector can find the right one again later.
 const getSelector = (element) => {
 	if (element.id) return `#${element.id}`
 
-	const parent = element.parentElement
-	if (!parent) return element.tagName.toLowerCase()
+	const parts = []
+	let current = element
 
-	const siblings = [...parent.children].filter((child) => {
-		return child.tagName === element.tagName
-	})
+	while (current && current.nodeType === 1 && current !== document.body) {
+		let selector = current.tagName.toLowerCase()
 
-	const index = siblings.indexOf(element) + 1
+		const parent = current.parentElement
+		if (!parent) break
 
-	return `${element.tagName.toLowerCase()}:nth-of-type(${index})`
+		const siblings = [...parent.children].filter((child) => {
+			return child.tagName === current.tagName
+		})
+
+		if (siblings.length > 1) {
+			const index = siblings.indexOf(current) + 1
+			selector += `:nth-of-type(${index})`
+		}
+
+		parts.unshift(selector)
+		current = parent
+	}
+
+	return parts.join(' > ')
 }
 
 // get element position
@@ -314,7 +328,8 @@ document.addEventListener('click', onPageClick, true)
 
 chrome.runtime.onMessage.addListener((message) => {
 	const actions = {
-		'toggle-annotate-mode': toggleAnnotating
+		'toggle-annotate-mode': toggleAnnotating, 
+		'clear-annotations': clearAnnotations
 	}
 
 	actions[message.action]?.()
@@ -331,3 +346,12 @@ if (saved) {
 
 window.addEventListener('scroll', repositionAnnotations)
 window.addEventListener('resize', repositionAnnotations)
+
+const clearAnnotations = () => {
+	annotations = []
+
+	localStorage.removeItem('notate-annotations')
+
+	clearRenderedAnnotations()
+	hideLayer()
+}

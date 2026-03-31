@@ -1,7 +1,9 @@
 // like Eric's chrome extension demo selecting for all ul buttons, but here I'm selecting for all elements in popup that has data-action attribute like Eric did with the tabId for the chrome tabs demo.
-const control = document.querySelector('[data-action]')
+const controls = document.querySelectorAll('[data-action]')
 
-const sendAction = async () => {
+const sendAction = async (event) => {
+	const control = event.currentTarget
+
 	// I only need the active tab in the current window because that's the page I want to annotate
 	const [tab] = await chrome.tabs.query({
 		active: true,
@@ -17,4 +19,6 @@ const sendAction = async () => {
 	})
 }
 
-control.addEventListener('click', sendAction)
+controls.forEach((control) => {
+	control.addEventListener('click', sendAction)
+})
