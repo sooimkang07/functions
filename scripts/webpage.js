@@ -36,38 +36,16 @@
 
 // renderReadingTime(document.querySelector("article"));
 
-// checking if script is running on matches (all_urls) not just the dev site from before
-// console.log("is this on?")
-
-// testing inline styling of all p on every page
-// let paras = document.querySelectorAll('p')
-// // console.log(paras)
-// paras.forEach(paragraph => {
-// 	paragraph.style.transform = 'skew(45deg)'
-//  })
-
-// styling all p elements by adding a class connected by our stylesheet css instead of inline styling so that it can be easily changed in the css file (for more complex styling later, want to keep as little js as possible)
-// let paras = document.querySelectorAll('p')
-// paras.forEach((paragraph) => {
-// 	paragraph.classList.add('italicize')
-// })
-
-// let paras = document.querySelectorAll('p')
-
-// // how to write the ui html for your extension
-// let container = `
-// 	<div id="paragraph-counter">
-// 		<p>You have ${paras.length} paragraphs on this page.</p>
-// 	</div>
-// `
-// document.body.insertAdjacentHTML('beforeend', container)
-
 // END OF ERIC'S DEMO
 // ______________________________________________________________________________________
+
 let activeTarget = null
 let modal
 let textarea
+let form
 
+let annotations = []
+let layer
 let isAnnotating = false
 
 // like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
@@ -83,11 +61,75 @@ const createBadge = () => {
 	document.body.append(badge)
 }
 
+// remove badge when exiting annotate mode
+// MDN remove(): https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
 const removeBadge = () => {
 	if (!badge) return
 
 	badge.remove()
 	badge = null
+}
+
+// create parent layer for notes
+const createLayer = () => {
+	if (layer) return
+
+	layer = document.createElement('aside')
+	layer.id = 'notate-layer'
+
+	document.body.append(layer)
+}
+
+// simple id generator
+// MDN Date.now(): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now
+const createAnnotationId = () => {
+	return `annotation-${Date.now()}`
+}
+
+// simple selector logic
+const getSelector = (element) => {
+	if (element.id) return `#${element.id}`
+
+	const parent = element.parentElement
+	if (!parent) return element.tagName.toLowerCase()
+
+	const siblings = [...parent.children].filter((child) => {
+		return child.tagName === element.tagName
+	})
+
+	const index = siblings.indexOf(element) + 1
+
+	return `${element.tagName.toLowerCase()}:nth-of-type(${index})`
+}
+
+// get element position
+// MDN getBoundingClientRect(): https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+const getNotePosition = (target) => {
+	const rect = target.getBoundingClientRect()
+
+	return {
+		top: rect.top + window.scrollY,
+		left: rect.right + window.scrollX + 8
+	}
+}
+
+// render annotation
+const renderAnnotation = (annotation) => {
+	createLayer()
+
+	const target = document.querySelector(annotation.selector)
+	if (!target) return
+
+	const position = getNotePosition(target)
+
+	const note = document.createElement('aside')
+	note.className = 'notate-note'
+	note.dataset.id = annotation.id
+	note.textContent = annotation.text
+	note.style.insetBlockStart = `${position.top}px`
+	note.style.insetInlineStart = `${position.left}px`
+
+	layer.append(note)
 }
 
 const toggleAnnotating = () => {
@@ -124,7 +166,7 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<label for="annotation-text">Notate</label>
+			<label for="annotation-text">Notation</label>
 			<textarea id="annotation-text" name="annotation-text"></textarea>
 			<menu>
 				<li>
@@ -139,7 +181,50 @@ const createModal = () => {
 	// so that the modal is part of the page and can be interacted with, instead of just being created in the background and not showing up
 	document.body.append(modal)
 
+	form = modal.querySelector('form')
 	textarea = modal.querySelector('textarea')
+
+	form.addEventListener('submit', onModalSubmit)
+}
+
+// modal submit
+// MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
+const onModalSubmit = (event) => {
+	event.preventDefault()
+
+	const submitter = event.submitter
+	if (!submitter) return
+
+	if (submitter.value === 'cancel') {
+		modal.close()
+		return
+	}
+
+	const text = textarea.value.trim()
+	if (!text) {
+		modal.close()
+		return
+	}
+
+	if (!activeTarget) {
+		modal.close()
+		return
+	}
+
+	const annotation = {
+		id: createAnnotationId(),
+		selector: getSelector(activeTarget),
+		text
+	}
+
+	annotations.push(annotation)
+
+	renderAnnotation(annotation)
+
+	textarea.value = ''
+	activeTarget = null
+
+	modal.close()
 }
 
 const onPageClick = (event) => {
@@ -153,7 +238,6 @@ const onPageClick = (event) => {
 	const clickedBadge = event.target.closest('#notate-badge')
 	if (clickedBadge) return
 
-    // stop normal clicking behavior from page while annotating to not compete
 	event.preventDefault()
 	event.stopPropagation()
 

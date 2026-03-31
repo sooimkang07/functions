@@ -68,3 +68,23 @@ html.is-annotating *:hover {
 		cursor: pointer;
 	}
 }
+
+#notate-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 2147483646;
+}
+
+.notate-note {
+	position: absolute;
+	inline-size: 12rem;
+	padding: 0.75rem;
+	background: #ffe992;
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 0.25rem;
+	box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+	color: black;
+	pointer-events: auto;
+	white-space: pre-wrap;
+}
