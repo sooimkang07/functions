@@ -138,3 +138,8 @@ html.is-annotating *:hover {
 		padding: 0.25rem;
 	}
 }
+
+.is-annotated {
+	outline: 2px solid var(--color-note);
+	outline-offset: 2px;
+}

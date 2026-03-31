@@ -47,6 +47,7 @@ let form
 let annotations = []
 let layer
 let isAnnotating = false
+let annotatedClass = 'is-annotated'
 
 // like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
 let badge
@@ -128,6 +129,20 @@ const getNotePosition = (target) => {
 	}
 }
 
+const highlightTarget = (selector) => {
+	const target = document.querySelector(selector)
+	if (!target) return
+
+	target.classList.add(annotatedClass)
+}
+
+const unhighlightTarget = (selector) => {
+	const target = document.querySelector(selector)
+	if (!target) return
+
+	target.classList.remove(annotatedClass)
+}
+
 const showLayer = () => {
 	createLayer()
 	layer.hidden = false
@@ -160,6 +175,8 @@ const renderAnnotation = (annotation) => {
 
 	const target = document.querySelector(annotation.selector)
 	if (!target) return
+
+	target.classList.add(annotatedClass)
 
 	const position = getNotePosition(target)
 
@@ -328,8 +345,13 @@ const getAnnotationById = (id) => {
 }
 
 const deleteAnnotation = (id) => {
-	annotations = annotations.filter((annotation) => {
-		return annotation.id !== id
+	const annotation = getAnnotationById(id)
+	if (!annotation) return
+
+	unhighlightTarget(annotation.selector)
+
+	annotations = annotations.filter((item) => {
+		return item.id !== id
 	})
 
 	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
@@ -383,6 +405,10 @@ window.addEventListener('scroll', repositionAnnotations)
 window.addEventListener('resize', repositionAnnotations)
 
 const clearAnnotations = () => {
+	annotations.forEach((annotation) => {
+		unhighlightTarget(annotation.selector)
+	})
+
 	annotations = []
 
 	localStorage.removeItem('notate-annotations')
