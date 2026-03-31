@@ -46,12 +46,13 @@ let form
 
 let annotations = []
 let layer
-let isAnnotating = false
-let annotatedClass = 'is-annotated'
-
-// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
 let badge
 
+let isAnnotating = false
+let annotatedClass = 'is-annotated'
+let editingAnnotationId = null
+
+// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
 const createBadge = () => {
 	if (badge) return
 
@@ -80,6 +81,36 @@ const createLayer = () => {
 	layer.hidden = true
 
 	document.body.append(layer)
+}
+
+// Create modal 
+const createModal = () => {
+	if (modal) return
+
+	modal = document.createElement('dialog')
+	modal.id = 'notate-modal'
+
+	modal.innerHTML = `
+		<form method="dialog">
+			<label for="annotation-text">Notation</label>
+			<textarea id="annotation-text" name="annotation-text"></textarea>
+			<menu>
+				<li>
+					<button type="submit" value="cancel">Cancel</button>
+				</li>
+				<li>
+					<button type="submit" value="save">Save</button>
+				</li>
+			</menu>
+		</form>
+	`
+	// so that the modal is part of the page and can be interacted with, instead of just being created in the background and not showing up
+	document.body.append(modal)
+
+	form = modal.querySelector('form')
+	textarea = modal.querySelector('textarea')
+
+	form.addEventListener('submit', onModalSubmit)
 }
 
 // simple id generator of timestamp so that each annotation has a unique id for rendering and saving the annotations and maybe editing later?
@@ -116,6 +147,12 @@ const getSelector = (element) => {
 	}
 
 	return parts.join(' > ')
+}
+
+const getAnnotationById = (id) => {
+	return annotations.find((annotation) => {
+		return annotation.id === id
+	})
 }
 
 // get element position
@@ -160,15 +197,6 @@ const clearRenderedAnnotations = () => {
 	layer.innerHTML = ''
 }
 
-const renderAllAnnotations = () => {
-	showLayer()
-	clearRenderedAnnotations()
-
-	annotations.forEach((annotation) => {
-		renderAnnotation(annotation)
-	})
-}
-
 // render annotation
 const renderAnnotation = (annotation) => {
 	createLayer()
@@ -176,7 +204,7 @@ const renderAnnotation = (annotation) => {
 	const target = document.querySelector(annotation.selector)
 	if (!target) return
 
-	target.classList.add(annotatedClass)
+	highlightTarget(annotation.selector)
 
 	const position = getNotePosition(target)
 
@@ -193,6 +221,63 @@ const renderAnnotation = (annotation) => {
 	note.style.insetInlineStart = `${position.left}px`
 
 	layer.append(note)
+}
+
+const renderAllAnnotations = () => {
+	showLayer()
+	clearRenderedAnnotations()
+
+	annotations.forEach((annotation) => {
+		renderAnnotation(annotation)
+	})
+}
+
+const updateAnnotation = (id, text) => {
+	const annotation = getAnnotationById(id)
+	if (!annotation) return
+
+	annotation.text = text
+
+	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+
+	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	if (!note) return
+
+	const noteText = note.querySelector('p')
+	if (!noteText) return
+
+	noteText.textContent = text
+}
+
+const deleteAnnotation = (id) => {
+	const annotation = getAnnotationById(id)
+	if (!annotation) return
+
+	unhighlightTarget(annotation.selector)
+
+	annotations = annotations.filter((item) => {
+		return item.id !== id
+	})
+
+	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+
+	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	if (!note) return
+
+	note.remove()
+}
+
+const clearAnnotations = () => {
+	annotations.forEach((annotation) => {
+		unhighlightTarget(annotation.selector)
+	})
+
+	annotations = []
+
+	localStorage.removeItem('notate-annotations')
+
+	clearRenderedAnnotations()
+	hideLayer()
 }
 
 const toggleAnnotating = () => {
@@ -219,44 +304,6 @@ const exitAnnotating = () => {
 	hideLayer()
 }
 
-// I wanted to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
-const onKeydown = (event) => {
-	if (event.key !== 'Escape') return
-	if (!isAnnotating) return
-
-	exitAnnotating()
-}
-
-// Create modal 
-const createModal = () => {
-	if (modal) return
-
-	modal = document.createElement('dialog')
-	modal.id = 'notate-modal'
-
-	modal.innerHTML = `
-		<form method="dialog">
-			<label for="annotation-text">Notation</label>
-			<textarea id="annotation-text" name="annotation-text"></textarea>
-			<menu>
-				<li>
-					<button type="submit" value="cancel">Cancel</button>
-				</li>
-				<li>
-					<button type="submit" value="save">Save</button>
-				</li>
-			</menu>
-		</form>
-	`
-	// so that the modal is part of the page and can be interacted with, instead of just being created in the background and not showing up
-	document.body.append(modal)
-
-	form = modal.querySelector('form')
-	textarea = modal.querySelector('textarea')
-
-	form.addEventListener('submit', onModalSubmit)
-}
-
 // modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything
 // MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
 const onModalSubmit = (event) => {
@@ -266,12 +313,27 @@ const onModalSubmit = (event) => {
 	if (!submitter) return
 
 	if (submitter.value === 'cancel') {
+		editingAnnotationId = null
+		activeTarget = null
 		modal.close()
 		return
 	}
 
 	const text = textarea.value.trim()
 	if (!text) {
+		editingAnnotationId = null
+		activeTarget = null
+		modal.close()
+		return
+	}
+
+	if (editingAnnotationId) {
+		updateAnnotation(editingAnnotationId, text)
+
+		textarea.value = ''
+		editingAnnotationId = null
+		activeTarget = null
+
 		modal.close()
 		return
 	}
@@ -295,8 +357,22 @@ const onModalSubmit = (event) => {
 
 	textarea.value = ''
 	activeTarget = null
+	editingAnnotationId = null
 
 	modal.close()
+}
+
+const onLayerClick = (event) => {
+	const deleteButton = event.target.closest('.notate-delete')
+	if (!deleteButton) return
+
+	event.preventDefault()
+	event.stopPropagation()
+
+	const note = deleteButton.closest('.notate-note')
+	if (!note) return
+
+	deleteAnnotation(note.dataset.id)
 }
 
 const onPageClick = (event) => {
@@ -317,6 +393,7 @@ const onPageClick = (event) => {
 	event.stopPropagation()
 
 	activeTarget = event.target
+	editingAnnotationId = null
 
 	createModal()
 
@@ -325,41 +402,34 @@ const onPageClick = (event) => {
 	modal.showModal()
 }
 
-const onLayerClick = (event) => {
-	const deleteButton = event.target.closest('.notate-delete')
-	if (!deleteButton) return
+const onNoteClick = (event) => {
+	const clickedDelete = event.target.closest('.notate-delete')
+	if (clickedDelete) return
+
+	const note = event.target.closest('.notate-note')
+	if (!note) return
 
 	event.preventDefault()
 	event.stopPropagation()
 
-	const note = deleteButton.closest('.notate-note')
-	if (!note) return
-
-	deleteAnnotation(note.dataset.id)
-}
-
-const getAnnotationById = (id) => {
-	return annotations.find((annotation) => {
-		return annotation.id === id
-	})
-}
-
-const deleteAnnotation = (id) => {
-	const annotation = getAnnotationById(id)
+	const annotation = getAnnotationById(note.dataset.id)
 	if (!annotation) return
 
-	unhighlightTarget(annotation.selector)
+	createModal()
 
-	annotations = annotations.filter((item) => {
-		return item.id !== id
-	})
+	editingAnnotationId = annotation.id
+	activeTarget = document.querySelector(annotation.selector)
+	textarea.value = annotation.text
 
-	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+	modal.showModal()
+}
 
-	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
-	if (!note) return
+// I wanted to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
+const onKeydown = (event) => {
+	if (event.key !== 'Escape') return
+	if (!isAnnotating) return
 
-	note.remove()
+	exitAnnotating()
 }
 
 const repositionAnnotations = () => {
@@ -380,20 +450,6 @@ const repositionAnnotations = () => {
 	})
 }
 
-document.addEventListener('click', onLayerClick, true)
-document.addEventListener('click', onPageClick, true)
-
-chrome.runtime.onMessage.addListener((message) => {
-	const actions = {
-		'toggle-annotate-mode': toggleAnnotating, 
-		'clear-annotations': clearAnnotations
-	}
-
-	actions[message.action]?.()
-})
-
-document.addEventListener('keydown', onKeydown)
-
 // when page loads, get the annotations from local storage and render them on the page
 const saved = localStorage.getItem('notate-annotations')
 
@@ -401,18 +457,19 @@ if (saved) {
 	annotations = JSON.parse(saved)
 }
 
+document.addEventListener('click', onLayerClick, true)
+document.addEventListener('click', onPageClick, true)
+document.addEventListener('click', onNoteClick, true)
+document.addEventListener('keydown', onKeydown)
+
 window.addEventListener('scroll', repositionAnnotations)
 window.addEventListener('resize', repositionAnnotations)
 
-const clearAnnotations = () => {
-	annotations.forEach((annotation) => {
-		unhighlightTarget(annotation.selector)
-	})
+chrome.runtime.onMessage.addListener((message) => {
+	const actions = {
+		'toggle-annotate-mode': toggleAnnotating,
+		'clear-annotations': clearAnnotations
+	}
 
-	annotations = []
-
-	localStorage.removeItem('notate-annotations')
-
-	clearRenderedAnnotations()
-	hideLayer()
-}
+	actions[message.action]?.()
+})
