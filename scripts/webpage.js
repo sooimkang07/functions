@@ -76,17 +76,18 @@ const createLayer = () => {
 
 	layer = document.createElement('aside')
 	layer.id = 'notate-layer'
+	layer.hidden = true
 
 	document.body.append(layer)
 }
 
-// simple id generator
+// simple id generator of timestamp so that each annotation has a unique id for rendering and saving the annotations and maybe editing later?
 // MDN Date.now(): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now
 const createAnnotationId = () => {
 	return `annotation-${Date.now()}`
 }
 
-// simple selector logic
+// so that the selector is unique to the element, I'm checking if it has an id first, then if it doesn't I check for its parent and its siblings to create a more specific selector.
 const getSelector = (element) => {
 	if (element.id) return `#${element.id}`
 
@@ -113,6 +114,32 @@ const getNotePosition = (target) => {
 	}
 }
 
+const showLayer = () => {
+	createLayer()
+	layer.hidden = false
+}
+
+const hideLayer = () => {
+	if (!layer) return
+
+	layer.hidden = true
+}
+
+const clearRenderedAnnotations = () => {
+	if (!layer) return
+
+	layer.innerHTML = ''
+}
+
+const renderAllAnnotations = () => {
+	showLayer()
+	clearRenderedAnnotations()
+
+	annotations.forEach((annotation) => {
+		renderAnnotation(annotation)
+	})
+}
+
 // render annotation
 const renderAnnotation = (annotation) => {
 	createLayer()
@@ -137,8 +164,14 @@ const toggleAnnotating = () => {
 
 	document.documentElement.classList.toggle('is-annotating', isAnnotating)
 
-	if (isAnnotating) createBadge()
-	else removeBadge()
+	if (isAnnotating) {
+		createBadge()
+		renderAllAnnotations()
+		return
+	}
+
+	removeBadge()
+	hideLayer()
 }
 
 const exitAnnotating = () => {
@@ -147,9 +180,10 @@ const exitAnnotating = () => {
 	document.documentElement.classList.remove('is-annotating')
 
 	removeBadge()
+	hideLayer()
 }
 
-// I want to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
+// I wanted to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
 const onKeydown = (event) => {
 	if (event.key !== 'Escape') return
 	if (!isAnnotating) return
@@ -187,7 +221,7 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 }
 
-// modal submit
+// modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything
 // MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
 const onModalSubmit = (event) => {
 	event.preventDefault()
@@ -252,6 +286,30 @@ const onPageClick = (event) => {
 	modal.showModal()
 }
 
+const getAnnotationById = (id) => {
+	return annotations.find((annotation) => {
+		return annotation.id === id
+	})
+}
+
+const repositionAnnotations = () => {
+	if (!isAnnotating) return
+
+	document.querySelectorAll('.notate-note').forEach((note) => {
+		const id = note.dataset.id
+		const annotation = getAnnotationById(id)
+		if (!annotation) return
+
+		const target = document.querySelector(annotation.selector)
+		if (!target) return
+
+		const position = getNotePosition(target)
+
+		note.style.insetBlockStart = `${position.top}px`
+		note.style.insetInlineStart = `${position.left}px`
+	})
+}
+
 document.addEventListener('click', onPageClick, true)
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -264,10 +322,12 @@ chrome.runtime.onMessage.addListener((message) => {
 
 document.addEventListener('keydown', onKeydown)
 
-// when page loads, get the annotations from local storage and render them on the page.
+// when page loads, get the annotations from local storage and render them on the page
 const saved = localStorage.getItem('notate-annotations')
 
 if (saved) {
 	annotations = JSON.parse(saved)
-	annotations.forEach(renderAnnotation)
 }
+
+window.addEventListener('scroll', repositionAnnotations)
+window.addEventListener('resize', repositionAnnotations)
