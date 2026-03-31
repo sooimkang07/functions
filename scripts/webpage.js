@@ -218,6 +218,8 @@ const onModalSubmit = (event) => {
 	}
 
 	annotations.push(annotation)
+	// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify converts the annotations array into a string the browser can save.
+	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
 
 	renderAnnotation(annotation)
 
@@ -262,10 +264,10 @@ chrome.runtime.onMessage.addListener((message) => {
 
 document.addEventListener('keydown', onKeydown)
 
-// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify coverts object into that onto page browser. 
-localStorage.setItem('notate-annotations', JSON.stringify(annotations))
-
-// when page loads, get the annotations from local storage and render them on the page. JSON parse converts the string back into an object that I can use to render the annotations.
+// when page loads, get the annotations from local storage and render them on the page.
 const saved = localStorage.getItem('notate-annotations')
-annotations = JSON.parse(saved)
-annotations.forEach(renderAnnotation)
+
+if (saved) {
+	annotations = JSON.parse(saved)
+	annotations.forEach(renderAnnotation)
+}
