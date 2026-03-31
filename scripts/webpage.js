@@ -261,3 +261,11 @@ chrome.runtime.onMessage.addListener((message) => {
 })
 
 document.addEventListener('keydown', onKeydown)
+
+// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify coverts object into that onto page browser. 
+localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+
+// when page loads, get the annotations from local storage and render them on the page. JSON parse converts the string back into an object that I can use to render the annotations.
+const saved = localStorage.getItem('notate-annotations')
+annotations = JSON.parse(saved)
+annotations.forEach(renderAnnotation)
