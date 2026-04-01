@@ -92,7 +92,6 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<label for="annotation-text">Notation</label>
 			<textarea id="annotation-text" name="annotation-text"></textarea>
 			<menu>
 				<li>
@@ -293,6 +292,10 @@ const toggleAnnotating = () => {
 
 	removeBadge()
 	hideLayer()
+
+	annotations.forEach((annotation) => {
+		unhighlightTarget(annotation.selector)
+	})
 }
 
 const exitAnnotating = () => {
@@ -302,6 +305,10 @@ const exitAnnotating = () => {
 
 	removeBadge()
 	hideLayer()
+
+	annotations.forEach((annotation) => {
+		unhighlightTarget(annotation.selector)
+	})
 }
 
 // modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything

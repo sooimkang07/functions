@@ -1,18 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Gaegu&display=swap');
+
 :root {
-	--space: 1rem;
+	--font-note: "Gaegu", sans-serif;
+	--font-ui: "Inter", sans-serif;
+	
 	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
+	--space-md: 1rem;
 	--space-lg: 2rem;
 
-	--note-inline-size: 12rem;
-	--modal-inline-size: 20rem;
-	--badge-inline-offset: 1rem;
+	--inline-size-note: 12rem;
+	--inline-size-modal: 20rem;
+	--inline-offset-badge: 1rem;
 
 	--radius-sm: 0.25rem;
 	--radius-md: 0.5rem;
 
 	--color-note: #ffe992;
-	--color-surface: white;
+	--color-ui: white;
 	--color-text: black;
 	--color-border: rgba(0, 0, 0, 0.2);
 	--color-overlay: rgba(255, 235, 59, 0.08);
@@ -25,31 +30,23 @@
 	--badge-z: 1000000000;
 }
 
-html.is-annotating {
-	cursor: crosshair;
-
-	&::before {
-		content: '';
-		position: fixed;
-		inset: 0;
-		background-color: var(--color-overlay);
-		pointer-events: none;
-		z-index: 1000000000;
-	}
-}
-
-html.is-annotating *:hover {
-	outline: 2px solid var(--color-note);
+html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
+	outline-color: var(--color-note);
+	outline-width: 2px;
+	outline-style: solid;
 	outline-offset: 2px;
 }
 
 #notate-badge {
 	position: fixed;
-	inset-block-start: var(--badge-inline-offset);
-	inset-inline-end: var(--badge-inline-offset);
-	padding: var(--space-xs) var(--space-sm);
+	inset-block-start: var(--inline-offset-badge);
+	inset-inline-end: var(--inline-offset-badge);
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-sm);
 	background-color: var(--color-note);
-	border: 1px solid var(--color-border);
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--color-border);
 	border-radius: var(--radius-sm);
 	color: var(--color-text);
 	z-index: var(--badge-z);
@@ -57,22 +54,46 @@ html.is-annotating *:hover {
 }
 
 #notate-modal {
-	inline-size: min(var(--modal-inline-size), calc(100vw - var(--space-lg)));
-	padding: var(--space);
-	border: 1px solid var(--color-border);
+	inline-size: 20rem;
+	aspect-ratio: 1 / 1;
+	/* max-inline-size: calc(100vw - var(--space-lg)); */
+	padding: var(--space-md);
+	border-style: none;
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-md);
+	box-sizing: border-box;
+	background-color: var(--color-note);
 
 	form {
-		display: grid;
-		gap: var(--space-sm);
+		block-size: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+
+	textarea,
+	button {
+		box-sizing: border-box;
 	}
 
 	textarea {
+		flex: 1;
 		inline-size: 100%;
+		max-inline-size: 100%;
+		min-inline-size: 0;
 		min-block-size: 8rem;
 		padding: var(--space-xs);
-		resize: vertical;
+		resize: none; /* want to style against default browser text input box resizing */
+		background: var(--color-note);
+		font-family: var(--font-note);
+		box-shadow: none;
+		appearance: none;
+
+		/* want to style against default browser text input box outline */
+		&:focus, 
+		&:focus-visible {
+			outline: none;
+			box-shadow: none;
+		}
 	}
 
 	menu {
@@ -88,12 +109,16 @@ html.is-annotating *:hover {
 	}
 
 	button {
-		padding: var(--space-xs) var(--space-sm);
-		border: 1px solid var(--color-border);
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-sm);
+		border-style: solid;
+		border-width: 1px;
+		border-color: var(--color-border);		
 		border-radius: var(--radius-sm);
-		background-color: var(--color-surface);
+		background-color: var(--color-ui);
 		cursor: pointer;
 		color: var(--color-text);
+		font-family: var(--font-ui);
 	}
 }
 
@@ -110,7 +135,7 @@ html.is-annotating *:hover {
 
 .notate-note {
 	position: absolute;
-	inline-size: var(--note-inline-size);
+	inline-size: var(--inline-size-note);
 	padding: var(--space-sm);
 	background: var(--color-note);
 	border: 1px solid var(--color-border);
@@ -118,8 +143,8 @@ html.is-annotating *:hover {
 	box-shadow: var(--shadow-sm);
 	color: var(--color-text);
 	pointer-events: auto;
-	white-space: pre-wrap;
 	z-index: var(--note-z);
+	font-family: var(--font-note);
 
 	p {
 		margin: 0;
@@ -140,6 +165,8 @@ html.is-annotating *:hover {
 }
 
 .is-annotated {
-	outline: 2px solid var(--color-note);
+	outline-width: 2px;
+	outline-style: solid;
+	outline-color: var(--color-note);
 	outline-offset: 2px;
 }

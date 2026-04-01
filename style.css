@@ -12,12 +12,11 @@
 } */
 
 :root {
-	--space: 1rem;
 	--space-sm: 0.75rem;
+	--space-md: 1rem;
 
 	--color-text: black;
 	--color-note: #ffe992;
-	--color-highlight: red;
 	--color-surface: white;
 	--color-surface-hover: #f5f5f5;
 	--color-border: #ccc;
@@ -26,22 +25,28 @@
 }
 
 body {
-	padding: var(--space);
+	padding: var(--space-md);
 	min-inline-size: 10rem;
 }
 
 main {
-	display: grid;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
 }
 
 button {
 	inline-size: 100%;
-	padding: var(--space-sm) var(--space);
-	border: 1px solid var(--color-border);
+	padding-block: var(--space-sm);
+	padding-inline: var(--space-md);
+	border-style: solid;
+	border-width: 1px;
+	border-color: var(--color-border);
 	border-radius: var(--radius-sm);
 	background-color: var(--color-surface);
 	cursor: pointer;
 	color: var(--color-text);
+	text-align: center;
 
 	&:hover {
 		background-color: var(--color-surface-hover);
