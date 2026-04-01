@@ -1,8 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Gaegu&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 :root {
 	--font-note: "Gaegu", sans-serif;
 	--font-ui: "Inter", sans-serif;
+
+	--fs-note: 2rem;
+	--fs-ui: 1rem;
 	
 	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
@@ -31,7 +34,7 @@
 	--badge-z: 1000000000;
 }
 
-html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
+html.is-annotating *:hover:not(.is-annotated):not(#notate-modal):not(#notate-modal *):not(.notate-note):not(.notate-note *):not(#notate-badge) {
 	outline-color: var(--color-note);
 	outline-width: 2px;
 	outline-style: solid;
@@ -52,6 +55,8 @@ html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
 	color: var(--color-text);
 	z-index: var(--badge-z);
 	pointer-events: none;
+	font-family: var(--font-ui);
+	font-size: var(--fs-ui);
 }
 
 #notate-modal {
@@ -89,6 +94,7 @@ html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
 		border: none;
 		box-shadow: none;
 		appearance: none;
+		font-size: var(--fs-note);
 
 		/* want to style against default browser text input box outline */
 		&:focus, 
@@ -151,12 +157,18 @@ html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
 	overflow-wrap: anywhere;
 	word-break: break-word;
 
+	&:hover {
+		background-color: #FFF5CD;
+	}
+
 	p {
 		margin: 0;
 		padding-inline-end: 1.5rem;
 		font-family: var(--font-note);
 		overflow-wrap: anywhere;
 		word-break: break-word;
+		color: var(--color-text);
+		font-size: var(--fs-note);
 	}
 
 	.notate-delete {
@@ -169,6 +181,7 @@ html.is-annotating *:hover:not(#notate-modal):not(#notate-modal *) {
 		font: inherit;
 		line-height: 1;
 		padding: 0.25rem;
+		color: var(--color-text);
 	}
 }
 

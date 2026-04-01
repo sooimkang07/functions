@@ -10,8 +10,14 @@
 	inset-inline-start: 24px;
 	inset-block-start: 24px;
 } */
+@import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 :root {
+	--font-ui: "Inter", sans-serif;	
+
+	--fs-ui: 1rem;
+		
+	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
 	--space-md: 1rem;
 
@@ -53,8 +59,8 @@ main {
 
 button {
 	inline-size: 100%;
-	padding-block: var(--space-sm);
-	padding-inline: var(--space-md);
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-sm);
 	border-style: solid;
 	border-width: 1px;
 	border-color: var(--color-border);
@@ -63,6 +69,8 @@ button {
 	cursor: pointer;
 	color: var(--color-text);
 	text-align: center;
+	font-size: var(--fs-ui);
+	font-family: var(--font-ui);
 
 	&:hover {
 		background-color: var(--color-surface-hover);

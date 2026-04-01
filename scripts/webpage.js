@@ -1,5 +1,4 @@
-// ______________________________________________________________________________________
-// ERIC'S DEMO: 
+// ERIC'S DEMO______________________________________________________________________________________
 // function renderReadingTime(article) {
 //   // If we weren't provided an article, we don't need to render anything.
 //   if (!article) {
@@ -36,8 +35,9 @@
 
 // renderReadingTime(document.querySelector("article"));
 
-// END OF ERIC'S DEMO
-// ______________________________________________________________________________________
+
+
+// VARIABLES______________________________________________________________________________________
 
 let activeTarget = null
 let modal
@@ -51,8 +51,59 @@ let badge
 let isAnnotating = false
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
+let storageKey = 'notate-annotations'
 
-// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on.
+
+
+// SAVE ANNOTATIONS- localStorage ______________________________________________________________________________________
+
+const saveAnnotations = () => {
+	// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify converts the annotations array into a string the browser can save.
+	localStorage.setItem(storageKey, JSON.stringify(annotations))
+}
+
+const loadAnnotations = () => {
+	const saved = localStorage.getItem(storageKey)
+
+	if (saved) {
+		annotations = JSON.parse(saved)
+	}
+}
+
+
+
+// MODAL STATES ______________________________________________________________________________________
+
+const resetModalState = () => {
+	textarea.value = ''
+	activeTarget = null
+	editingAnnotationId = null
+}
+
+const closeModal = () => {
+	resetModalState()
+	modal.close()
+}
+
+const openCreateModal = (target) => {
+	activeTarget = target
+	editingAnnotationId = null
+	textarea.value = ''
+	modal.showModal()
+}
+
+const openEditModal = (annotation) => {
+	editingAnnotationId = annotation.id
+	activeTarget = document.querySelector(annotation.selector)
+	textarea.value = annotation.text
+	modal.showModal()
+}
+
+
+
+// ANNOTATION MODE UI______________________________________________________________________________________
+
+// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on
 const createBadge = () => {
 	if (badge) return
 
@@ -83,7 +134,7 @@ const createLayer = () => {
 	document.body.append(layer)
 }
 
-// Create modal 
+// create modal 
 const createModal = () => {
 	if (modal) return
 
@@ -103,6 +154,7 @@ const createModal = () => {
 			</menu>
 		</form>
 	`
+
 	// so that the modal is part of the page and can be interacted with, instead of just being created in the background and not showing up
 	document.body.append(modal)
 
@@ -112,14 +164,17 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 }
 
+
+
+// ANNOTATION DATA______________________________________________________________________________________
+
 // simple id generator of timestamp so that each annotation has a unique id for rendering and saving the annotations and maybe editing later?
 // MDN Date.now(): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now
 const createAnnotationId = () => {
 	return `annotation-${Date.now()}`
 }
 
-// so that the selector is more specific to the exact element, I'm checking if it has an id first,
-// and if it doesn't I'm building a parent > child path with nth-of-type so querySelector can find the right one again later.
+// so that the selector is more specific to the exact element, I'm checking if it has an id first, and if it doesn't I'm building a parent > child path with nth-of-type so querySelector can find the right one again later
 const getSelector = (element) => {
 	if (element.id) return `#${element.id}`
 
@@ -130,8 +185,6 @@ const getSelector = (element) => {
 		let selector = current.tagName.toLowerCase()
 
 		const parent = current.parentElement
-		if (!parent) break
-
 		const siblings = [...parent.children].filter((child) => {
 			return child.tagName === current.tagName
 		})
@@ -154,16 +207,39 @@ const getAnnotationById = (id) => {
 	})
 }
 
-// get element position
-// MDN getBoundingClientRect(): https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+
+
+// ANNOTATION POSITIONING______________________________________________________________________________________
+
+// needed to get the selected element's position to position the note to it, so googled "how to get element position on page js" then found https://stackoverflow.com/questions/442404/retrieve-the-position-x-y-of-an-html-element which lef me to getBoundingClientRect(): https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
 const getNotePosition = (target) => {
+	
 	const rect = target.getBoundingClientRect()
+	const gap = 8
+	const noteWidth = 12 * 16
+	const viewportLeft = window.scrollX
+	const viewportRight = window.scrollX + window.innerWidth
+
+	let left = rect.right + window.scrollX + gap
+	let top = rect.top + window.scrollY
+
+	if (left + noteWidth > viewportRight - gap) {
+		left = rect.left + window.scrollX - noteWidth - gap
+	}
+
+	if (left < viewportLeft + gap) {
+		left = viewportLeft + gap
+	}
 
 	return {
-		top: rect.top + window.scrollY,
-		left: rect.right + window.scrollX + 8
+		top,
+		left
 	}
 }
+
+
+
+// OUTLINE SELECTED ELEMENT______________________________________________________________________________________
 
 const highlightTarget = (selector) => {
 	const target = document.querySelector(selector)
@@ -179,22 +255,32 @@ const unhighlightTarget = (selector) => {
 	target.classList.remove(annotatedClass)
 }
 
+
+
+// LAYER VISIBILITY______________________________________________________________________________________
+
 const showLayer = () => {
 	createLayer()
 	layer.hidden = false
 }
 
 const hideLayer = () => {
-	if (!layer) return
-
 	layer.hidden = true
 }
 
 const clearRenderedAnnotations = () => {
-	if (!layer) return
-
 	layer.innerHTML = ''
 }
+
+const clearHighlights = () => {
+	annotations.forEach((annotation) => {
+		unhighlightTarget(annotation.selector)
+	})
+}
+
+
+
+// ANNOTATION RENDERING______________________________________________________________________________________
 
 // render annotation
 const renderAnnotation = (annotation) => {
@@ -203,14 +289,15 @@ const renderAnnotation = (annotation) => {
 	const target = document.querySelector(annotation.selector)
 	if (!target) return
 
-	highlightTarget(annotation.selector)
-
 	const position = getNotePosition(target)
+
+	highlightTarget(annotation.selector)
 
 	const note = document.createElement('aside')
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
 
+	// want to create an "x" corner button to delete the annotation, inserting through html
 	note.innerHTML = `
 		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
 		<p>${annotation.text}</p>
@@ -231,125 +318,11 @@ const renderAllAnnotations = () => {
 	})
 }
 
-const updateAnnotation = (id, text) => {
-	const annotation = getAnnotationById(id)
-	if (!annotation) return
 
-	annotation.text = text
 
-	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
+// ANNOTATION EDITING______________________________________________________________________________________
 
-	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
-	if (!note) return
-
-	const noteText = note.querySelector('p')
-	if (!noteText) return
-
-	noteText.textContent = text
-}
-
-const deleteAnnotation = (id) => {
-	const annotation = getAnnotationById(id)
-	if (!annotation) return
-
-	unhighlightTarget(annotation.selector)
-
-	annotations = annotations.filter((item) => {
-		return item.id !== id
-	})
-
-	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
-
-	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
-	if (!note) return
-
-	note.remove()
-}
-
-const clearAnnotations = () => {
-	annotations.forEach((annotation) => {
-		unhighlightTarget(annotation.selector)
-	})
-
-	annotations = []
-
-	localStorage.removeItem('notate-annotations')
-
-	clearRenderedAnnotations()
-	hideLayer()
-}
-
-const toggleAnnotating = () => {
-	isAnnotating = !isAnnotating
-
-	document.documentElement.classList.toggle('is-annotating', isAnnotating)
-
-	if (isAnnotating) {
-		createBadge()
-		renderAllAnnotations()
-		return
-	}
-
-	removeBadge()
-	hideLayer()
-
-	annotations.forEach((annotation) => {
-		unhighlightTarget(annotation.selector)
-	})
-}
-
-const exitAnnotating = () => {
-	isAnnotating = false
-
-	document.documentElement.classList.remove('is-annotating')
-
-	removeBadge()
-	hideLayer()
-
-	annotations.forEach((annotation) => {
-		unhighlightTarget(annotation.selector)
-	})
-}
-
-// modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything
-// MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
-const onModalSubmit = (event) => {
-	event.preventDefault()
-
-	const submitter = event.submitter
-	if (!submitter) return
-
-	if (submitter.value === 'cancel') {
-		editingAnnotationId = null
-		activeTarget = null
-		modal.close()
-		return
-	}
-
-	const text = textarea.value.trim()
-	if (!text) {
-		editingAnnotationId = null
-		activeTarget = null
-		modal.close()
-		return
-	}
-
-	if (editingAnnotationId) {
-		updateAnnotation(editingAnnotationId, text)
-
-		textarea.value = ''
-		editingAnnotationId = null
-		activeTarget = null
-
-		modal.close()
-		return
-	}
-
-	if (!activeTarget) {
-		modal.close()
-		return
-	}
-
+const createAnnotation = (text) => {
 	const annotation = {
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
@@ -357,18 +330,114 @@ const onModalSubmit = (event) => {
 	}
 
 	annotations.push(annotation)
-	// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify converts the annotations array into a string the browser can save.
-	localStorage.setItem('notate-annotations', JSON.stringify(annotations))
 
+	saveAnnotations()
 	renderAnnotation(annotation)
-
-	textarea.value = ''
-	activeTarget = null
-	editingAnnotationId = null
-
-	modal.close()
 }
 
+const updateAnnotation = (id, text) => {
+	const annotation = getAnnotationById(id)
+	annotation.text = text
+
+	saveAnnotations()
+
+	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	const noteText = note.querySelector('p')
+	noteText.textContent = text
+}
+
+const deleteAnnotation = (id) => {
+	const annotation = getAnnotationById(id)
+
+	unhighlightTarget(annotation.selector)
+
+	annotations = annotations.filter((item) => {
+		return item.id !== id
+	})
+
+	saveAnnotations()
+
+	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	note.remove()
+}
+
+const clearAnnotations = () => {
+	clearHighlights()
+
+	annotations = []
+
+	localStorage.removeItem(storageKey)
+
+	clearRenderedAnnotations()
+	hideLayer()
+}
+
+
+
+// START/STOP ANNOTATION MODE______________________________________________________________________________________
+
+const startAnnotating = () => {
+	isAnnotating = true
+	document.documentElement.classList.add('is-annotating')
+	createBadge()
+	renderAllAnnotations()
+}
+
+const stopAnnotating = () => {
+	isAnnotating = false
+	document.documentElement.classList.remove('is-annotating')
+	removeBadge()
+	hideLayer()
+	clearHighlights()
+}
+
+const toggleAnnotating = () => {
+	const nextAction = isAnnotating ? stopAnnotating : startAnnotating
+	nextAction()
+}
+
+const exitAnnotating = () => {
+	stopAnnotating()
+}
+
+
+
+// SAVE MODAL______________________________________________________________________________________
+
+// modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything
+// MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
+const onModalSubmit = (event) => {
+	event.preventDefault()
+
+	const submitValue = event.submitter.value
+	const text = textarea.value.trim()
+
+	if (submitValue === 'cancel') {
+		closeModal()
+		return
+	}
+
+	if (!text) {
+		closeModal()
+		return
+	}
+
+	if (editingAnnotationId) {
+		updateAnnotation(editingAnnotationId, text)
+		closeModal()
+		return
+	}
+
+	createAnnotation(text)
+	closeModal()
+}
+
+
+
+// EVENT HANDLERS______________________________________________________________________________________
+
+// delete note when clicking x button
+// using closest to make sure that if I click the "x" button, it deletes the annotation, but if I click anywhere else on the note, it opens the edit modal, so that the delete and edit functions don't interfere with each other: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
 const onLayerClick = (event) => {
 	const deleteButton = event.target.closest('.notate-delete')
 	if (!deleteButton) return
@@ -377,41 +446,27 @@ const onLayerClick = (event) => {
 	event.stopPropagation()
 
 	const note = deleteButton.closest('.notate-note')
-	if (!note) return
-
 	deleteAnnotation(note.dataset.id)
 }
 
+// create new modal when clicking normal page element (so not if annotation mode is off, modal already open, i clicked inside modal, clicked badge, and clicked existing note)
 const onPageClick = (event) => {
 	if (!isAnnotating) return
-	// if the modal is already open, do nothing
 	if (modal?.open) return
-
-	const clickedInsideModal = event.target.closest('#notate-modal')
-	if (clickedInsideModal) return
-
-	const clickedBadge = event.target.closest('#notate-badge')
-	if (clickedBadge) return
-
-	const clickedNote = event.target.closest('.notate-note')
-	if (clickedNote) return
+	if (event.target.closest('#notate-modal')) return
+	if (event.target.closest('#notate-badge')) return
+	if (event.target.closest('.notate-note')) return
 
 	event.preventDefault()
 	event.stopPropagation()
 
-	activeTarget = event.target
-	editingAnnotationId = null
-
 	createModal()
-
-	textarea.value = ''
-
-	modal.showModal()
+	openCreateModal(event.target)
 }
 
+// edit existing annotation when clicked on, pull from saved object using note's id (getAnnotationById(note.dataset.id))
 const onNoteClick = (event) => {
-	const clickedDelete = event.target.closest('.notate-delete')
-	if (clickedDelete) return
+	if (event.target.closest('.notate-delete')) return
 
 	const note = event.target.closest('.notate-note')
 	if (!note) return
@@ -420,15 +475,9 @@ const onNoteClick = (event) => {
 	event.stopPropagation()
 
 	const annotation = getAnnotationById(note.dataset.id)
-	if (!annotation) return
 
 	createModal()
-
-	editingAnnotationId = annotation.id
-	activeTarget = document.querySelector(annotation.selector)
-	textarea.value = annotation.text
-
-	modal.showModal()
+	openEditModal(annotation)
 }
 
 // I wanted to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
@@ -439,30 +488,34 @@ const onKeydown = (event) => {
 	exitAnnotating()
 }
 
+const repositionNote = (note) => {
+	const id = note.dataset.id
+	const annotation = getAnnotationById(id)
+	const target = document.querySelector(annotation.selector)
+	const position = getNotePosition(target)
+
+	note.style.insetBlockStart = `${position.top}px`
+	note.style.insetInlineStart = `${position.left}px`
+}
+
 const repositionAnnotations = () => {
 	if (!isAnnotating) return
 
 	document.querySelectorAll('.notate-note').forEach((note) => {
-		const id = note.dataset.id
-		const annotation = getAnnotationById(id)
-		if (!annotation) return
-
-		const target = document.querySelector(annotation.selector)
-		if (!target) return
-
-		const position = getNotePosition(target)
-
-		note.style.insetBlockStart = `${position.top}px`
-		note.style.insetInlineStart = `${position.left}px`
+		repositionNote(note)
 	})
 }
 
-// when page loads, get the annotations from local storage and render them on the page
-const saved = localStorage.getItem('notate-annotations')
 
-if (saved) {
-	annotations = JSON.parse(saved)
-}
+
+// INITIAL LOAD______________________________________________________________________________________
+
+// when page loads, get the annotations from local storage and render them on the page
+loadAnnotations()
+
+
+
+// EVENT LISTENERS______________________________________________________________________________________
 
 document.addEventListener('click', onLayerClick, true)
 document.addEventListener('click', onPageClick, true)
@@ -478,5 +531,5 @@ chrome.runtime.onMessage.addListener((message) => {
 		'clear-annotations': clearAnnotations
 	}
 
-	actions[message.action]?.()
+	actions[message.action]()
 })
