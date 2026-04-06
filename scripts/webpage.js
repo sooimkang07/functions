@@ -120,6 +120,8 @@ const createToolbar = () => {
 			</button>
 		</div>
 	`
+
+	document.body.append(toolbar)
 }
 
 // remove toolbar when exiting annotate mode
