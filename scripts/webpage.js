@@ -46,7 +46,7 @@ let form
 
 let annotations = []
 let layer
-let badge
+let toolbar
 
 let isAnnotating = false
 let annotatedClass = 'is-annotated'
@@ -103,24 +103,24 @@ const openEditModal = (annotation) => {
 
 // ANNOTATION MODE UI______________________________________________________________________________________
 
-// like in Eric's reading time demo, adding a badge to show that we're in annotation mode, and also to have a place to put the "clear annotations" button later on
-const createBadge = () => {
-	if (badge) return
+// like in Eric's reading time demo, adding a toolbar to show that we're in annotation mode, allow users to exit annotation mode, clear annotations, and eventually customize annotation style
+const createToolbar = () => {
+	if (toolbar) return
 
-	badge = document.createElement('aside')
-	badge.id = 'notate-badge'
-	badge.textContent = 'Annotating'
+	toolbar = document.createElement('aside')
+	toolbar.id = 'notate-toolbar'
+	toolbar.textContent = 'Annotating'
 
-	document.body.append(badge)
+	document.body.append(toolbar)
 }
 
-// remove badge when exiting annotate mode
+// remove toolbar when exiting annotate mode
 // MDN remove(): https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
-const removeBadge = () => {
-	if (!badge) return
+const removeToolbar = () => {
+	if (!toolbar) return
 
-	badge.remove()
-	badge = null
+	toolbar.remove()
+	toolbar = null
 }
 
 // create parent layer for notes
@@ -379,14 +379,14 @@ const clearAnnotations = () => {
 const startAnnotating = () => {
 	isAnnotating = true
 	document.documentElement.classList.add('is-annotating')
-	createBadge()
+	createToolbar()
 	renderAllAnnotations()
 }
 
 const stopAnnotating = () => {
 	isAnnotating = false
 	document.documentElement.classList.remove('is-annotating')
-	removeBadge()
+	removeToolbar()
 	hideLayer()
 	clearHighlights()
 }
@@ -449,12 +449,12 @@ const onLayerClick = (event) => {
 	deleteAnnotation(note.dataset.id)
 }
 
-// create new modal when clicking normal page element (so not if annotation mode is off, modal already open, i clicked inside modal, clicked badge, and clicked existing note)
+// create new modal when clicking normal page element (so not if annotation mode is off, modal already open, i clicked inside modal, clicked toolbar, and clicked existing note)
 const onPageClick = (event) => {
 	if (!isAnnotating) return
 	if (modal?.open) return
 	if (event.target.closest('#notate-modal')) return
-	if (event.target.closest('#notate-badge')) return
+	if (event.target.closest('#notate-toolbar')) return
 	if (event.target.closest('.notate-note')) return
 
 	event.preventDefault()
