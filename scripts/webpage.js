@@ -103,15 +103,23 @@ const openEditModal = (annotation) => {
 
 // ANNOTATION MODE UI______________________________________________________________________________________
 
-// like in Eric's reading time demo, adding a toolbar to show that we're in annotation mode, allow users to exit annotation mode, clear annotations, and eventually customize annotation style
+// like in Eric's reading time demo, adding a toolbar to allow users to exit annotation mode, clear annotations, and eventually customize annotation style
 const createToolbar = () => {
 	if (toolbar) return
 
 	toolbar = document.createElement('aside')
 	toolbar.id = 'notate-toolbar'
-	toolbar.textContent = 'Annotating'
 
-	document.body.append(toolbar)
+	toolbar.innerHTML = `
+		<div class="notate-toolbar-group">
+			<button class="notate-toolbar-button" type="button" data-action="clear">
+				Clear all annotations
+			</button>
+			<button class="notate-toolbar-button" type="button" data-action="exit">
+				Exit Notate
+			</button>
+		</div>
+	`
 }
 
 // remove toolbar when exiting annotate mode
