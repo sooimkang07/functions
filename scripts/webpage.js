@@ -51,59 +51,110 @@ let toolbar
 let isAnnotating = false
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
+// save all current annotations in the browser so they still exist when visiting site later
+// Storage.setItem: https://developer.mozilla.org/en-US/docs/Web/API/Storage/setItem, JSON.stringify: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify
+// takes annotations array and saves it under storageKey as a string
 let storageKey = 'notate-annotations'
 
-
-
-// SAVE ANNOTATIONS- localStorage ______________________________________________________________________________________
-
-const saveAnnotations = () => {
-	// in Eric's setting up JSON in HTML lecture, he said local storage can only handle strings so JSON stringify converts the annotations array into a string the browser can save.
-	localStorage.setItem(storageKey, JSON.stringify(annotations))
+// keep one shared saved object in chrome storage so popup and content script can both read it
+// chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage, async: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function, await from Eric demo, logical OR operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR
+const getStoredAnnotations = async () => {
+	const stored = await chrome.storage.local.get(storageKey)
+	return stored[storageKey] || {}
 }
 
-const loadAnnotations = () => {
-	const saved = localStorage.getItem(storageKey)
+// use the current page url as the key for that page's annotation group
+// Location.href: https://developer.mozilla.org/en-US/docs/Web/API/Location/href
+// keeps each page's saved notes separated by its own url
+const getPageKey = () => {
+	return location.href
+}
 
-	if (saved) {
-		annotations = JSON.parse(saved)
+// save this page back into the extension storage
+// chrome.storage.local.set: https://developer.chrome.com/docs/extensions/reference/api/storage
+// stores title, url, annotations, and updatedAt so the popup can sort by recency later
+const saveAnnotations = async () => {
+	// instead of saving one array per page in localStorage, save this page inside the shared extension storage
+	const storedAnnotations = await getStoredAnnotations()
+
+	storedAnnotations[getPageKey()] = {
+		title: document.title,
+		url: location.href,
+		annotations,
+		updatedAt: Date.now()
 	}
+
+	await chrome.storage.local.set({
+		[storageKey]: storedAnnotations
+	})
 }
 
+// pull saved annotations back in when the page loads
+// chrome.storage.local.get returns the shared annotation object, then this page pulls only its own annotations back out
+const loadAnnotations = async () => {
+	const storedAnnotations = await getStoredAnnotations()
+	const pageData = storedAnnotations[getPageKey()]
 
+	annotations = pageData?.annotations || []
+}
 
-// MODAL STATES ______________________________________________________________________________________
+// remove this page's saved record completely when it no longer has any annotations
+// delete operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
+const removeStoredPage = async () => {
+	const storedAnnotations = await getStoredAnnotations()
+	delete storedAnnotations[getPageKey()]
 
+	await chrome.storage.local.set({
+		[storageKey]: storedAnnotations
+	})
+}
+
+// modal resets after save/cancel
+// HTMLTextAreaElement.value: https://developer.mozilla.org/en-US/docs/Web/API/HTMLTextAreaElement#value
+// clears textarea.value, activeTarget and editingAnnotationId so nothing carries over
 const resetModalState = () => {
 	textarea.value = ''
 	activeTarget = null
 	editingAnnotationId = null
 }
 
+// close modal
+// HTMLDialogElement.close: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/close
+// resets the modal state first then closes
 const closeModal = () => {
+	if (!modal) return
+
 	resetModalState()
 	modal.close()
 }
 
+// open modal to create a new annotation
+// HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
+// stores the clicked target in activeTarget, clears edit mode, opens modal
 const openCreateModal = (target) => {
+	createModal()
+
 	activeTarget = target
 	editingAnnotationId = null
 	textarea.value = ''
 	modal.showModal()
 }
 
+// open the modal with an existing annotation
+// Document.querySelector: https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector, HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
+// uses annotation.selector, annotation.id, and annotation.text to reopen the right note in edit mode
 const openEditModal = (annotation) => {
+	createModal()
+
 	editingAnnotationId = annotation.id
 	activeTarget = document.querySelector(annotation.selector)
 	textarea.value = annotation.text
 	modal.showModal()
 }
 
-
-
-// ANNOTATION MODE UI______________________________________________________________________________________
-
-// like in Eric's reading time demo, adding a toolbar to allow users to exit annotation mode, clear annotations, and eventually customize annotation style
+// place clear and exit buttons in toolbar when annotation mode is on
+// Document.createElement: https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement, Element.append: https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+// builds #notate-toolbar, fills it with the two buttons, inserts it into document.body to show up on page
 const createToolbar = () => {
 	if (toolbar) return
 
@@ -113,7 +164,7 @@ const createToolbar = () => {
 	toolbar.innerHTML = `
 		<div class="notate-toolbar-group">
 			<button class="notate-toolbar-button" type="button" data-action="clear">
-				Clear all annotations
+				Clear all notations
 			</button>
 			<button class="notate-toolbar-button" type="button" data-action="exit">
 				Exit Notate
@@ -124,8 +175,8 @@ const createToolbar = () => {
 	document.body.append(toolbar)
 }
 
-// remove toolbar when exiting annotate mode
-// MDN remove(): https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
+// remove toolbar when annotate mode off
+// Element.remove: https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
 const removeToolbar = () => {
 	if (!toolbar) return
 
@@ -133,7 +184,9 @@ const removeToolbar = () => {
 	toolbar = null
 }
 
-// create parent layer for notes
+// one parent parent layer holds all notes
+// Document.createElement: https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement, HTMLElement.hidden: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidden
+// builds #notate-layer, hides it by default, puts it to the page
 const createLayer = () => {
 	if (layer) return
 
@@ -144,7 +197,8 @@ const createLayer = () => {
 	document.body.append(layer)
 }
 
-// create modal 
+// insert cancel and save buttons through html in the modal
+// dialog element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog
 const createModal = () => {
 	if (modal) return
 
@@ -156,10 +210,10 @@ const createModal = () => {
 			<textarea id="annotation-text" name="annotation-text"></textarea>
 			<menu>
 				<li>
-					<button type="submit" value="cancel">Cancel</button>
+					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
-					<button type="submit" value="save">Save</button>
+					<button type="submit" name="intent" value="save">Save</button>
 				</li>
 			</menu>
 		</form>
@@ -174,17 +228,16 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 }
 
-
-
-// ANNOTATION DATA______________________________________________________________________________________
-
-// simple id generator of timestamp so that each annotation has a unique id for rendering and saving the annotations and maybe editing later?
-// MDN Date.now(): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now
+// give each annotation its own id to reference
+// googled: https://www.google.com/search?q=how+do+i+get+each+modal+to+have+its+own+unique+id+vanilla+js&sca_esv=11902b971e361d2f&rlz=1C5CHFA_enUS976US983&biw=1709&bih=890&sxsrf=ANbL-n5oWC9vRtJ8YIbSE2bnmta1B1g8xA%3A1775516025216&ei=eTnUae7tDMa05NoP7_Gw-Aw&ved=0ahUKEwiujufPqNqTAxVGGlkFHe84DM8Q4dUDCBE&uact=5&oq=how+do+i+get+each+modal+to+have+its+own+unique+id+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiPGhvdyBkbyBpIGdldCBlYWNoIG1vZGFsIHRvIGhhdmUgaXRzIG93biB1bmlxdWUgaWQgdmFuaWxsYSBqczIKECEYChigARjDBDIKECEYChigARjDBEiNEVCKAljCEHADeAGQAQCYAWGgAf4FqgEBObgBA8gBAPgBAZgCCKAC3QPCAgoQABhHGNYEGLADwgIFECEYqwKYAwCIBgGQBgiSBwM3LjGgB6IqsgcDNC4xuAfPA8IHBTAuNy4xyAcPgAgB&sclient=gws-wiz-serp, chose option 3, looked it up Crypto.randomUUID on MDN: https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID
+// returns a fresh unique id so render, edit, and delete can target the right annotation later
 const createAnnotationId = () => {
-	return `annotation-${Date.now()}`
+	return crypto.randomUUID()
 }
 
-// so that the selector is more specific to the exact element, I'm checking if it has an id first, and if it doesn't I'm building a parent > child path with nth-of-type so querySelector can find the right one again later
+// use saved path later to find the same clicked element again
+// referenced: https://stackoverflow.com/questions/8588301/how-to-generate-unique-css-selector-for-dom-element, then looked up: Element.id: https://developer.mozilla.org/en-US/docs/Web/API/Element/id, :nth-of-type: https://developer.mozilla.org/en-US/docs/Web/CSS/:nth-of-type
+// uses an element id if there is one, or builds a parent > child:nth-of-type() path and connects it with >
 const getSelector = (element) => {
 	if (element.id) return `#${element.id}`
 
@@ -211,17 +264,18 @@ const getSelector = (element) => {
 	return parts.join(' > ')
 }
 
+// needed to find single saved annotation from its id
+// Array.find: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
+// searches the annotations array and returns the annotation that matches the id
 const getAnnotationById = (id) => {
 	return annotations.find((annotation) => {
 		return annotation.id === id
 	})
 }
 
-
-
-// ANNOTATION POSITIONING______________________________________________________________________________________
-
-// needed to get the selected element's position to position the note to it, so googled "how to get element position on page js" then found https://stackoverflow.com/questions/442404/retrieve-the-position-x-y-of-an-html-element which lef me to getBoundingClientRect(): https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+// show each note to right of annotated element and not fall offscreen
+// googled: https://www.google.com/search?q=how+to+get+position+of+element+vanilla+js&sca_esv=11902b971e361d2f&rlz=1C5CHFA_enUS976US983&biw=1709&bih=890&sxsrf=ANbL-n4AdvI89TLz6hwh0LGDcDjIV8_jWg%3A1775516305269&ei=kTrUaaqMEJmj5NoP1PWl4Q4&ved=0ahUKEwjqmKzVqdqTAxWZEVkFHdR6KewQ4dUDCBE&uact=5&oq=how+to+get+position+of+element+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiKWhvdyB0byBnZXQgcG9zaXRpb24gb2YgZWxlbWVudCB2YW5pbGxhIGpzMggQIRigARjDBDIFECEYqwJIzxhQkwRYrxdwA3gBkAEAmAFSoAHJBaoBAjEwuAEDyAEA-AEBmAINoALtBcICChAAGEcY1gQYsAPCAgYQABgHGB7CAgUQABjvBcICBhAAGB4YDcICChAhGAoYoAEYwwSYAwCIBgGQBgiSBwIxM6AH4SSyBwIxMLgH5gXCBwQzLjEwyAcPgAgB&sclient=gws-wiz-serp, which led me to MDN: Element.getBoundingClientRect: https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect, Window.scrollX: https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollX 
+// measures the target, calculates top and left, flips note to other side if overflows viewport
 const getNotePosition = (target) => {
 	
 	const rect = target.getBoundingClientRect()
@@ -233,6 +287,7 @@ const getNotePosition = (target) => {
 	let left = rect.right + window.scrollX + gap
 	let top = rect.top + window.scrollY
 
+	// referenced this for if logic outside of viewport: https://gomakethings.com/how-to-check-if-any-part-of-an-element-is-out-of-the-viewport-with-vanilla-js/
 	if (left + noteWidth > viewportRight - gap) {
 		left = rect.left + window.scrollX - noteWidth - gap
 	}
@@ -247,10 +302,9 @@ const getNotePosition = (target) => {
 	}
 }
 
-
-
-// OUTLINE SELECTED ELEMENT______________________________________________________________________________________
-
+// outline the targeted element
+// Element.classList: https://developer.mozilla.org/en-US/docs/Web/API/Element/classList
+// re-finds the element from selector and adds the 'is-annotated' class
 const highlightTarget = (selector) => {
 	const target = document.querySelector(selector)
 	if (!target) return
@@ -258,6 +312,9 @@ const highlightTarget = (selector) => {
 	target.classList.add(annotatedClass)
 }
 
+// remove outline when not targeted or deleted
+// DOMTokenList.remove: https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/remove
+// removes 'is-annotated'` class
 const unhighlightTarget = (selector) => {
 	const target = document.querySelector(selector)
 	if (!target) return
@@ -265,34 +322,44 @@ const unhighlightTarget = (selector) => {
 	target.classList.remove(annotatedClass)
 }
 
-
-
-// LAYER VISIBILITY______________________________________________________________________________________
-
+// show note layer when annotation mode is active
+// HTMLElement.hidden: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidden
+// makes sure layer exists first then sets layer.hidden = false
 const showLayer = () => {
 	createLayer()
 	layer.hidden = false
 }
 
+// hide the note layer without deleting it
+// HTMLElement.hidden: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidden
+// flips layer.hidden back to true
 const hideLayer = () => {
+	if (!layer) return
+
 	layer.hidden = true
 }
 
+// clear all rendered note markup before rebuilding
+// Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
+// empties the note layer by setting layer.innerHTML = ''
 const clearRenderedAnnotations = () => {
+	if (!layer) return
+
 	layer.innerHTML = ''
 }
 
+// remove all annotation outlines from the page at once
+// Array.forEach: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach
+// loops through annotations and calls unhighlightTarget(annotation.selector) for each one
 const clearHighlights = () => {
 	annotations.forEach((annotation) => {
 		unhighlightTarget(annotation.selector)
 	})
 }
 
-
-
-// ANNOTATION RENDERING______________________________________________________________________________________
-
-// render annotation
+// one saved annotation object becomes one visible sticky note on page
+// HTMLElement.dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset 
+// finds the target from annotation.selector, positions a .notate-note, sets note.dataset.id, and adds it into layer
 const renderAnnotation = (annotation) => {
 	createLayer()
 
@@ -307,7 +374,7 @@ const renderAnnotation = (annotation) => {
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
 
-	// want to create an "x" corner button to delete the annotation, inserting through html
+	// "x" corner button to delete the annotation, inserting through html
 	note.innerHTML = `
 		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
 		<p>${annotation.text}</p>
@@ -319,6 +386,8 @@ const renderAnnotation = (annotation) => {
 	layer.append(note)
 }
 
+// all saved annotations to render back onto the page together
+// shows the layer, clears old note markup, re-renders every item in annotations
 const renderAllAnnotations = () => {
 	showLayer()
 	clearRenderedAnnotations()
@@ -328,11 +397,10 @@ const renderAllAnnotations = () => {
 	})
 }
 
-
-
-// ANNOTATION EDITING______________________________________________________________________________________
-
-const createAnnotation = (text) => {
+// saving a new note to create the object, store it, and show it right away
+// Array.push: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push
+// builds a new annotation from activeTarget and text, inserts into annotations, saves it, renders it
+const createAnnotation = async (text) => {
 	const annotation = {
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
@@ -341,22 +409,28 @@ const createAnnotation = (text) => {
 
 	annotations.push(annotation)
 
-	saveAnnotations()
+	await saveAnnotations()
 	renderAnnotation(annotation)
 }
 
-const updateAnnotation = (id, text) => {
+// editing a note updates both the saved data and the visible note text
+// Node.textContent: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
+// updates the matching annotation object, saves annotations, updates the <p> inside .notate-note[data-id="${id}"]
+const updateAnnotation = async (id, text) => {
 	const annotation = getAnnotationById(id)
 	annotation.text = text
 
-	saveAnnotations()
+	await saveAnnotations()
 
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
 	const noteText = note.querySelector('p')
 	noteText.textContent = text
 }
 
-const deleteAnnotation = (id) => {
+// clicking the x fully removes that annotation everywhere
+// Array.filter: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter, Element.remove https://developer.mozilla.org/en-US/docs/Web/API/Element/remove
+// unhighlights the target, filters the item out of annotations, saves again, removes that note element from page
+const deleteAnnotation = async (id) => {
 	const annotation = getAnnotationById(id)
 
 	unhighlightTarget(annotation.selector)
@@ -365,27 +439,32 @@ const deleteAnnotation = (id) => {
 		return item.id !== id
 	})
 
-	saveAnnotations()
+	// to save an empty annotations array or remove the page's record entirely when the last annotation is deleted, so that the popup can show the empty state instead of a page with 0 annotations
+	if (annotations.length) {
+		await saveAnnotations()
+	} else {
+		await removeStoredPage()
+	}
 
+	// grab annotation by id, unhighlight its target, filter it out of annotations array, save again, then find the note element by id and remove it from the page
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
 	note.remove()
 }
 
-const clearAnnotations = () => {
+// clear this page's annotations everywhere at once
+// resets annotations to an empty array, removes this page from extension storage, clears the layer
+const clearAnnotations = async () => {
 	clearHighlights()
 
 	annotations = []
-
-	localStorage.removeItem(storageKey)
+	await removeStoredPage()
 
 	clearRenderedAnnotations()
 	hideLayer()
 }
 
-
-
-// START/STOP ANNOTATION MODE______________________________________________________________________________________
-
+// DOMTokenList.add: https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/add
+// sets isAnnotating = true, adds 'is-annotating' on document.documentElement, creates toolbar, renders notes
 const startAnnotating = () => {
 	isAnnotating = true
 	document.documentElement.classList.add('is-annotating')
@@ -393,33 +472,38 @@ const startAnnotating = () => {
 	renderAllAnnotations()
 }
 
+// DOMTokenList.remove: https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/remove
+// sets isAnnotating = false, removes 'is-annotating', removes toolbar, hides layer, clears highlights
 const stopAnnotating = () => {
 	isAnnotating = false
 	document.documentElement.classList.remove('is-annotating')
 	removeToolbar()
-	hideLayer()
+	hideLayer()	
+	if (modal?.open) {
+		closeModal()
+	}
 	clearHighlights()
 }
 
+// conditional operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Conditional_operator
+// picks either startAnnotating or stopAnnotating based on isAnnotating and then runs it, so i can consolidate same function to toggle both on and off
 const toggleAnnotating = () => {
 	const nextAction = isAnnotating ? stopAnnotating : startAnnotating
 	nextAction()
 }
 
+// all exitAnnotating calls stopAnnotating so wherever I call, same exit happens
 const exitAnnotating = () => {
 	stopAnnotating()
 }
 
-
-
-// SAVE MODAL______________________________________________________________________________________
-
-// modal submit so that when I submit the form, it saves the annotation and renders it on the page, and if I click cancel or submit with no text, it just closes the modal without saving anything
-// MDN preventDefault(): https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault
-const onModalSubmit = (event) => {
+// Event.preventDefault: https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault, SubmitEvent.submitter: https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter
+// consolidate to one function so it reads event.submitter.value and textarea.value.trim() to either cancel, ignore blank text, update an existing note, or create a new one
+const onModalSubmit = async (event) => {
 	event.preventDefault()
 
-	const submitValue = event.submitter.value
+	const formData = new FormData(form)
+	const submitValue = event.submitter?.value || formData.get('intent') || 'save'
 	const text = textarea.value.trim()
 
 	if (submitValue === 'cancel') {
@@ -433,22 +517,19 @@ const onModalSubmit = (event) => {
 	}
 
 	if (editingAnnotationId) {
-		updateAnnotation(editingAnnotationId, text)
+		await updateAnnotation(editingAnnotationId, text)
 		closeModal()
 		return
 	}
 
-	createAnnotation(text)
+	await createAnnotation(text)
 	closeModal()
 }
 
-
-
-// EVENT HANDLERS______________________________________________________________________________________
-
-// delete note when clicking x button
-// using closest to make sure that if I click the "x" button, it deletes the annotation, but if I click anywhere else on the note, it opens the edit modal, so that the delete and edit functions don't interfere with each other: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
-const onLayerClick = (event) => {
+// click the x button inside a note to delete only that note
+// Element.closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
+// checks for .notate-delete, finds the parent .notate-note, deletes it using note.dataset.id
+const onLayerClick = async (event) => {
 	const deleteButton = event.target.closest('.notate-delete')
 	if (!deleteButton) return
 
@@ -456,25 +537,29 @@ const onLayerClick = (event) => {
 	event.stopPropagation()
 
 	const note = deleteButton.closest('.notate-note')
-	deleteAnnotation(note.dataset.id)
+	await deleteAnnotation(note.dataset.id)
 }
 
-// create new modal when clicking normal page element (so not if annotation mode is off, modal already open, i clicked inside modal, clicked toolbar, and clicked existing note)
+// page clicks anywhere except on modal, toolbar, and note open modal
+// Array.some: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/some, Event.stopPropagation: https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation
+// ignores #notate-modal, #notate-toolbar, and .notate-note, then opens create mode on the clicked page element
 const onPageClick = (event) => {
-	if (!isAnnotating) return
-	if (modal?.open) return
-	if (event.target.closest('#notate-modal')) return
-	if (event.target.closest('#notate-toolbar')) return
-	if (event.target.closest('.notate-note')) return
+	const blockedSelectors = ['#notate-modal', '#notate-toolbar', '.notate-note']
+	const clickedInsideBlockedUi = blockedSelectors.some((selector) => {
+		return event.target.closest(selector)
+	})
+
+	if (!isAnnotating || modal?.open || clickedInsideBlockedUi) return
 
 	event.preventDefault()
 	event.stopPropagation()
 
-	createModal()
 	openCreateModal(event.target)
 }
 
-// edit existing annotation when clicked on, pull from saved object using note's id (getAnnotationById(note.dataset.id))
+// click an existing note to reopen for editing
+// HTMLElement.dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset, Element.closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
+// ignores the delete button, finds the clicked .notate-note, gets its id from note.dataset.id, opens that annotation in edit mode
 const onNoteClick = (event) => {
 	if (event.target.closest('.notate-delete')) return
 
@@ -486,18 +571,42 @@ const onNoteClick = (event) => {
 
 	const annotation = getAnnotationById(note.dataset.id)
 
-	createModal()
 	openEditModal(annotation)
 }
 
-// I wanted to exit annotation mode when clicking escape like what the font extension: https://developer.mozilla.org/en-US/docs/Web/API/Element/keydown_event
+
+
+// toolbar buttons do different actions depending on which one i clicked
+// Element.closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest, dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
+// finds clicked toolbar button inside #notate-toolbar, reads its data-action, then runs clearAnnotations or exitAnnotating
+const onToolbarClick = async (event) => {
+	const button = event.target.closest('#notate-toolbar [data-action]')
+	const action = button?.dataset.action
+	const toolbarActions = {
+		clear: clearAnnotations,
+		exit: exitAnnotating
+	}
+
+	if (!action || !toolbarActions[action]) return
+
+	event.preventDefault()
+	event.stopPropagation()
+
+	await toolbarActions[action]()
+}
+
+// Escape key exits annotation mode
+// KeyboardEvent.key: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key
 const onKeydown = (event) => {
-	if (event.key !== 'Escape') return
-	if (!isAnnotating) return
+	if (event.key !== 'Escape' || !isAnnotating) return
 
 	exitAnnotating()
 }
 
+// each note moves with its annotated element when the page shifts
+// HTMLElement.dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
+// CSS logical properties: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_logical_properties_and_values
+// grabs the saved id off the note, re-finds the original target, then updates the note position
 const repositionNote = (note) => {
 	const id = note.dataset.id
 	const annotation = getAnnotationById(id)
@@ -508,10 +617,14 @@ const repositionNote = (note) => {
 	note.style.insetInlineStart = `${position.left}px`
 }
 
+// all notes reposition together on scroll and resize
+// Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
+// NodeList.forEach: https://developer.mozilla.org/en-US/docs/Web/API/NodeList/forEach
+// only runs while annotating so this isn't doing extra work all the time
 const repositionAnnotations = () => {
-	if (!isAnnotating) return
+	if (!isAnnotating || !layer) return
 
-	document.querySelectorAll('.notate-note').forEach((note) => {
+	layer.querySelectorAll('.notate-note').forEach((note) => {
 		repositionNote(note)
 	})
 }
@@ -520,8 +633,13 @@ const repositionAnnotations = () => {
 
 // INITIAL LOAD______________________________________________________________________________________
 
-// when page loads, get the annotations from local storage and render them on the page
-loadAnnotations()
+// when page loads, pull this page's annotations from shared extension storage
+// async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
+const initAnnotations = async () => {
+	await loadAnnotations()
+}
+
+initAnnotations()
 
 
 
@@ -530,16 +648,24 @@ loadAnnotations()
 document.addEventListener('click', onLayerClick, true)
 document.addEventListener('click', onPageClick, true)
 document.addEventListener('click', onNoteClick, true)
+document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
 
 window.addEventListener('scroll', repositionAnnotations)
 window.addEventListener('resize', repositionAnnotations)
 
+
+// listen for popup messages like start annotating or clear this page
+// chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 chrome.runtime.onMessage.addListener((message) => {
-	const actions = {
+	const runtimeActions = {
+		'enter-annotation-mode': startAnnotating,
 		'toggle-annotate-mode': toggleAnnotating,
 		'clear-annotations': clearAnnotations
 	}
+	const action = runtimeActions[message.action]
 
-	actions[message.action]()
+	if (!action) return
+
+	action()
 })

@@ -4,16 +4,13 @@
 	"description": "Annotate webpage elements with notes",
 	"version": "1.0",
 	"permissions": [
-		"activeTab"
+		"activeTab",
+		"tabs",
+		"storage"
 	],
-	"background": {
-		// removed the popup because i wanted to enter annotation mode immediately after clicking the extension icon instead of a button in the popup
-		// looked up https://www.google.com/search?q=how+to+start+my+chrome+extension+on+click+not+on+popup&rlz=1C5CHFA_enUS976US983&oq=how+to+start+my+chrome+extension+on+click+not+on+popup&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigAdIBCDgwNzZqMGo3qAIAsAIA&sourceid=chrome&ie=UTF-8
-		// so knew to add background script to listen for extension icon click and then send message to content script to start annotation mode 
-		"service_worker": "scripts/background.js"
-	},
 	"action": {
-		"default_title": "Notate"
+		"default_title": "Notate",
+		"default_popup": "index.html"
 	},
 	"content_scripts": [
 		{
@@ -24,7 +21,7 @@
 				"scripts/webpage.js"
 			],
 			"css": [
-				"webpage.css"
+				"styles/webpage.css"
 			]
 		}
 	],
