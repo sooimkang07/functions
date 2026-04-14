@@ -82,18 +82,29 @@ const findMatchingTab = async (url) => {
 	})
 }
 
-// activate existing tab or open new one
-// chrome.tabs.update: https://developer.chrome.com/docs/extensions/reference/api/tabs
-// chrome.tabs.create: https://developer.chrome.com/docs/extensions/reference/api/tabs
+// write the url we want to annotate into storage so webpage.js can read it after the page loads
+// popup closes before a new tab finishes loading, so need chrome local storage to hold/send the url to webpage.js
+// chrome.storage.local.set: https://developer.chrome.com/docs/extensions/reference/api/storage
+const setPendingAnnotationUrl = async (url) => {
+	await chrome.storage.local.set({ 'notate-pending-url': url })
+}
+
+// activate existing tab or open new one, then flag it to enter annotation mode
+// existing tabs get a direct message since webpage.js is already running
+// new tabs rely on the storage flag since the popup closes before the page finishes loading
+// chrome.tabs.update and chrome.tabs.create: https://developer.chrome.com/docs/extensions/reference/api/tabs
 const activateOrOpenPage = async (url) => {
 	const matchingTab = await findMatchingTab(url)
 
 	if (matchingTab?.id) {
 		await chrome.tabs.update(matchingTab.id, { active: true })
+		await setPendingAnnotationUrl(url)
+		await chrome.tabs.sendMessage(matchingTab.id, { action: 'enter-annotation-mode' })
 		window.close()
 		return
 	}
 
+	await setPendingAnnotationUrl(url)
 	await chrome.tabs.create({ url })
 	window.close()
 }

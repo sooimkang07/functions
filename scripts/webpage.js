@@ -339,7 +339,7 @@ const hideLayer = () => {
 	layer.hidden = true
 }
 
-// clear all rendered note markup before rebuilding
+// clear all notes
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 // empties the note layer by setting layer.innerHTML = ''
 const clearRenderedAnnotations = () => {
@@ -492,11 +492,6 @@ const toggleAnnotating = () => {
 	nextAction()
 }
 
-// all exitAnnotating calls stopAnnotating so wherever I call, same exit happens
-const exitAnnotating = () => {
-	stopAnnotating()
-}
-
 // Event.preventDefault: https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault, SubmitEvent.submitter: https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter
 // consolidate to one function so it reads event.submitter.value and textarea.value.trim() to either cancel, ignore blank text, update an existing note, or create a new one
 const onModalSubmit = async (event) => {
@@ -578,13 +573,13 @@ const onNoteClick = (event) => {
 
 // toolbar buttons do different actions depending on which one i clicked
 // Element.closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest, dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
-// finds clicked toolbar button inside #notate-toolbar, reads its data-action, then runs clearAnnotations or exitAnnotating
+// finds clicked toolbar button inside #notate-toolbar, reads its data-action, then runs clearAnnotations or stopAnnotating
 const onToolbarClick = async (event) => {
 	const button = event.target.closest('#notate-toolbar [data-action]')
 	const action = button?.dataset.action
 	const toolbarActions = {
 		clear: clearAnnotations,
-		exit: exitAnnotating
+		exit: stopAnnotating
 	}
 
 	if (!action || !toolbarActions[action]) return
@@ -600,7 +595,7 @@ const onToolbarClick = async (event) => {
 const onKeydown = (event) => {
 	if (event.key !== 'Escape' || !isAnnotating) return
 
-	exitAnnotating()
+	stopAnnotating()
 }
 
 // each note moves with its annotated element when the page shifts
@@ -633,10 +628,33 @@ const repositionAnnotations = () => {
 
 // INITIAL LOAD______________________________________________________________________________________
 
+// scroll to the first annotation's target element so it's immediately visible
+// Element.scrollIntoView: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
+const scrollToFirstAnnotation = () => {
+	const first = annotations[0]
+	if (!first) return
+
+	const target = document.querySelector(first.selector)
+	if (!target) return
+
+	target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 // when page loads, pull this page's annotations from shared extension storage
+// then check if the popup flagged this url to auto-enter annotation mode
+// chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
 // async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
 const initAnnotations = async () => {
 	await loadAnnotations()
+
+	const stored = await chrome.storage.local.get('notate-pending-url')
+	const pendingUrl = stored['notate-pending-url']
+
+	if (pendingUrl !== location.href) return
+
+	await chrome.storage.local.remove('notate-pending-url')
+	startAnnotating()
+	scrollToFirstAnnotation()
 }
 
 initAnnotations()
