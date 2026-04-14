@@ -6,8 +6,14 @@
 	"permissions": [
 		"activeTab",
 		"tabs",
+		// need to give windows permission AND tabs from the popup 
+		// https://developer.chrome.com/docs/extensions/reference/api/windows
+		"windows",
 		"storage"
 	],
+	"background": {
+		"service_worker": "scripts/background.js"
+	},
 	"action": {
 		"default_title": "Notate",
 		"default_popup": "index.html"
