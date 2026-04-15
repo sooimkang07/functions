@@ -640,6 +640,26 @@ const scrollToFirstAnnotation = () => {
 	target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
+// keep the enter-annotation-mode behavior in one function so initial load and popup messages do the same thing
+// if the tab is hidden when this runs (i.e. we were just switched to it), wait until it's visible to scroll
+// otherwise scrollIntoView fires before the tab is actually on screen and the scroll is lost
+// Document.visibilityState: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState
+// visibilitychange event: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
+const enterAnnotationMode = async () => {
+	await loadAnnotations()
+	startAnnotating()
+
+	if (document.visibilityState === 'visible') {
+		requestAnimationFrame(() => {
+			scrollToFirstAnnotation()
+		})
+	} else {
+		document.addEventListener('visibilitychange', () => {
+			scrollToFirstAnnotation()
+		}, { once: true })
+	}
+}
+
 // when page loads, pull this page's annotations from shared extension storage
 // then check if the popup flagged this url to auto-enter annotation mode
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
@@ -653,8 +673,7 @@ const initAnnotations = async () => {
 	if (pendingUrl !== location.href) return
 
 	await chrome.storage.local.remove('notate-pending-url')
-	startAnnotating()
-	scrollToFirstAnnotation()
+	enterAnnotationMode()
 }
 
 initAnnotations()
@@ -677,7 +696,7 @@ window.addEventListener('resize', repositionAnnotations)
 // chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 chrome.runtime.onMessage.addListener((message) => {
 	const runtimeActions = {
-		'enter-annotation-mode': startAnnotating,
+		'enter-annotation-mode': enterAnnotationMode,
 		'toggle-annotate-mode': toggleAnnotating,
 		'clear-annotations': clearAnnotations
 	}
