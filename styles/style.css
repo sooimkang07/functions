@@ -1,22 +1,10 @@
-/* ERIC'S DEMO */
-/* .italicize {
-	transform: skew(-45deg);
-}
-
-#paragraph-counter {
-	position: fixed;
-	background-color: white;
-	padding: 24px;
-	inset-inline-start: 24px;
-	inset-block-start: 24px;
-} */
 @import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 :root {
 	--font-ui: "Inter", sans-serif;	
 
-	--fs-large: 1.2rem;
-	--fs-regular: 1rem;
+	--fs-large: 1.1rem;
+	--fs-regular: .9rem;
 		
 	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
@@ -29,7 +17,8 @@
 	--color-surface-hover: #f5f5f5;
 	--color-border: #ccc;
 
-	--radius-sm: 1rem;
+	--radius-button: 10rem;
+	--radius-page: .7rem;
 }
 
 html, body {
@@ -64,7 +53,7 @@ button {
 	border-style: solid;
 	border-width: 1px;
 	border-color: var(--color-border);
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-button);
 	background-color: var(--color-surface);
 	cursor: pointer;
 	color: var(--color-text);
@@ -82,13 +71,6 @@ button {
 	flex-direction: column;
 	gap: var(--space-xs);
 	margin-block-start: var(--space-xs);
-	
-	h1 {
-		margin: 0;
-		font-family: var(--font-ui);
-		font-size: var(--fs-large);
-		font-weight: 600;
-	}
 
 	.annotation-pages {
 		display: flex;
@@ -100,46 +82,63 @@ button {
 	}
 }
 
-.popup-page-button {
+.popup-header {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-	text-align: start;
+	gap: var(--space-xs);
+	padding-block: var(--space-sm);
+	padding-inline: var(--space-md);
 }
 
-.popup-page-copy {
-	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-	min-inline-size: 0;
+.popup-header-favicon {
+	flex-shrink: 0;
 }
 
-.popup-page-title,
-.popup-page-url,
-.popup-page-count,
-.popup-empty-state {
+.popup-header-title {
+	margin: 0;
 	font-family: var(--font-ui);
-}
-
-.popup-page-title,
-.popup-page-url {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.popup-page-title {
-	font-size: var(--fs-large);
+	font-size: var(--fs-regular);
 	font-weight: 600;
 }
 
-.popup-page-url,
+.popup-section {
+	h1 {
+		text-align: center;
+		font-size: var(--fs-regular);
+		font-family: var(--font-ui);
+		font-weight: 600;
+	}
+}
+
+.popup-page-button {
+	display: flex;
+	align-items: center;
+	gap: var(--space-xs);
+	text-align: start;
+	border-radius: var(--radius-page);
+	border: none;
+}
+
+.popup-page-favicon {
+	flex-shrink: 0;
+}
+
 .popup-page-count,
 .popup-empty-state {
+	font-family: var(--font-ui);
 	font-size: var(--fs-regular);
 }
 
-.popup-page-count {
+.popup-page-title {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 600;
+	font-size: var(--fs-regular);
+}
+
+.popup-page-count,
+.popup-empty-state {
 	flex-shrink: 0;
 }
