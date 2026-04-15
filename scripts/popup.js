@@ -3,14 +3,14 @@ let storageKey = 'notate-annotations'
 let list = document.querySelector('#annotation-pages')
 let annotateButton = document.querySelector('[data-action="start-annotating"]')
 
-// get the shared saved annotations object the popup and content script both read from 
+// get the shared saved annotations object the popup and webpage script both read from 
 // chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage
 const getStoredAnnotations = async () => {
 	const stored = await chrome.storage.local.get(storageKey)
 	return stored[storageKey] || {}
 }
 
-// get the active tab in the current window so popup actions hit the page you're actually on
+// get the active tab in the current window so popup actions hit the page I'm actually on
 // chrome.tabs.query: https://developer.chrome.com/docs/extensions/reference/api/tabs
 const getActiveTab = async () => {
 	const tabs = await chrome.tabs.query({
@@ -48,8 +48,8 @@ const getAnnotationLabel = (count) => {
 }
 
 // turn one saved page object into one list item in the popup
-// grab the favicon from google's favicon service using just the page origin
-// googled: https://www.google.com/search?q=grab+favicon+of+url+vanilla+js&sca_esv=298796d921a32d3f&rlz=1C5CHFA_enUS976US983&biw=1710&bih=898&sxsrf=ANbL-n5Bx71MbsMdyv_qO5uiL-1PgfeaDQ%3A1776223936243&ei=wAbfaeLHDqSp5NoPxuzUgQc&ved=0ahUKEwjip4vm9e6TAxWkFFkFHUY2NXAQ4dUDCBM&uact=5&oq=grab+favicon+of+url+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiHmdyYWIgZmF2aWNvbiBvZiB1cmwgdmFuaWxsYSBqczIFECEYoAEyBRAhGKABMgUQIRigATIFECEYoAEyBRAhGKABMgUQIRirAkjhAlC4AVi4AXABeAGQAQCYAV2gAV2qAQExuAEDyAEA-AEBmAICoAJlwgIKEAAYRxjWBBiwA5gDAIgGAZAGCJIHATKgB6AFsgcBMbgHY8IHAzAuMsgHAoAIAQ&sclient=gws-wiz-serp
+// get the favicon from google's favicon service using just the page origin
+// googled: https://www.google.com/search?q=grab+favicon+of+url+vanilla+js&sca_esv=298796d921a32d3f&rlz=1C5CHFA_enUS976US983&biw=1710&bih=898&sxsrf=ANbL-n5Bx71MbsMdyv_qO5uiL-1PgfeaDQ%3A1776223936243&ei=wAbfaeLHDqSp5NoPxuzUgQc&ved=0ahUKEwjip4vm9e6TAxWkFFkFHUY2NXAQ4dUDCBM&uact=5&oq=grab+favicon+of+url+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiHmdyYWIgZmF2aWNvbiBvZiB1cmwgdmFuaWxsYSBqczIFECEYoAEyBRAhGKABMgUQIRigATIFECEYoAEyBRAhGKABMgUQIRirAkjhAlC4AVi4AXABeAGQAQCYAV2gAV2qAQExuAEDyAEA-AEBmAICoAJlwgIKEAAYRxjWBBiwA5gDAIgGAZAGCJIHATKgB6AFsgcBMbgHY8IHAzAuMsgHAoAIAQ&sclient=gws-wiz-serp, followed to this: https://stackoverflow.com/questions/10282939/how-to-get-favicons-url-from-a-generic-webpage-in-javascript 
 // URL: https://developer.mozilla.org/en-US/docs/Web/API/URL/URL
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
 const createPageItem = (page) => {
@@ -73,7 +73,7 @@ const createPageItem = (page) => {
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 const renderEmptyState = () => {
 	list.innerHTML = `
-		<li class="popup-empty-state">No saved notations yet</li>
+		<li class="popup-empty-state">No notations yet</li>
 	`
 }
 
@@ -94,7 +94,7 @@ const setPendingAnnotationUrl = async (url) => {
 }
 
 // if the page is already open somewhere, tell background.js to switch to it
-// can't do the window/tab focus directly here because chrome blocks it while the popup is still open
+// tried doing the window/tab focus directly but couldn't because chrome blocks it while the popup is still open
 // if it's not open, just create a new tab and let the pending url in storage handle the rest
 // chrome.runtime.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 // chrome.tabs.create: https://developer.chrome.com/docs/extensions/reference/api/tabs
@@ -116,7 +116,7 @@ const activateOrOpenPage = async (url) => {
 	window.close()
 }
 
-// link each saved-page button
+// link each annotated page button
 // Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
 const bindPageButtons = () => {
 	const buttons = list.querySelectorAll('button')
