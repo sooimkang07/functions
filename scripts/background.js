@@ -14,7 +14,7 @@ chrome.runtime.onMessage.addListener((message) => {
     // chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs#method-sendMessage
 	chrome.windows.update(windowId, { focused: true }, () => {
 		chrome.tabs.update(tabId, { active: true }, () => {
-			chrome.tabs.sendMessage(tabId, { action: 'enter-annotation-mode' }, () => {
+			chrome.tabs.sendMessage(tabId, { action: 'enter-annotation-mode-scroll' }, () => {
 				chrome.storage.local.remove('notate-pending-url')
 			})
 		})

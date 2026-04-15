@@ -22,14 +22,20 @@ const getActiveTab = async () => {
 }
 
 // send a message from the popup to webpage.js on the active tab
+// if the message fails, the pending url in storage acts as the fallback on reload
 // chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
 const sendActionToActiveTab = async (action) => {
 	const tab = await getActiveTab()
 	if (!tab?.id) return
 
 	await setPendingAnnotationUrl(tab.url)
-	await chrome.tabs.sendMessage(tab.id, { action })
-	await chrome.storage.local.remove('notate-pending-url')
+
+	try {
+		await chrome.tabs.sendMessage(tab.id, { action })
+		await chrome.storage.local.remove('notate-pending-url')
+	} catch {
+		await chrome.tabs.reload(tab.id)
+	}
 }
 
 // sort saved pages so the most recent ones show first in popup
