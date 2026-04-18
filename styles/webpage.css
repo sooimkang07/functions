@@ -41,6 +41,15 @@
 
 html {
 	&.is-annotating {
+		*, *:hover {
+			cursor: crosshair;
+		}
+		
+		#notate-toolbar *, #notate-toolbar *:hover,
+		#notate-modal *, #notate-modal *:hover {
+			cursor: pointer;
+		}
+
 		*:hover:not(.is-annotated):not(#notate-modal):not(#notate-modal *):not(.notate-note):not(.notate-note *):not(#notate-toolbar):not(#notate-toolbar *) {
 			outline: var(--outline-annotating);
 			outline-offset: 0.125rem;
