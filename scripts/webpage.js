@@ -276,8 +276,10 @@ const getAnnotationById = (id) => {
 // show each note to right of annotated element and not fall offscreen
 // googled: https://www.google.com/search?q=how+to+get+position+of+element+vanilla+js&sca_esv=11902b971e361d2f&rlz=1C5CHFA_enUS976US983&biw=1709&bih=890&sxsrf=ANbL-n4AdvI89TLz6hwh0LGDcDjIV8_jWg%3A1775516305269&ei=kTrUaaqMEJmj5NoP1PWl4Q4&ved=0ahUKEwjqmKzVqdqTAxWZEVkFHdR6KewQ4dUDCBE&uact=5&oq=how+to+get+position+of+element+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiKWhvdyB0byBnZXQgcG9zaXRpb24gb2YgZWxlbWVudCB2YW5pbGxhIGpzMggQIRigARjDBDIFECEYqwJIzxhQkwRYrxdwA3gBkAEAmAFSoAHJBaoBAjEwuAEDyAEA-AEBmAINoALtBcICChAAGEcY1gQYsAPCAgYQABgHGB7CAgUQABjvBcICBhAAGB4YDcICChAhGAoYoAEYwwSYAwCIBgGQBgiSBwIxM6AH4SSyBwIxMLgH5gXCBwQzLjEwyAcPgAgB&sclient=gws-wiz-serp, which led me to MDN: Element.getBoundingClientRect: https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect, Window.scrollX: https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollX 
 // measures the target, calculates top and left, flips note to other side if overflows viewport
-const getNotePosition = (target) => {
-	
+// stacks notes on the same target by adding heights of annotations that come before this one in the saved array
+// using array order instead of DOM order avoids measuring the note itself or notes below it
+// HTMLElement.offsetHeight: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight
+const getNotePosition = (target, selector, annotationId) => {
 	const rect = target.getBoundingClientRect()
 	const gap = 8
 	const noteWidth = 12 * 16
@@ -296,10 +298,24 @@ const getNotePosition = (target) => {
 		left = viewportLeft + gap
 	}
 
-	return {
-		top,
-		left
+	// find all annotations on the same target that were saved before this one
+	// && for logical AND operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_AND
+	// add their heights so this note lands below them
+	// .filter: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter 
+	// .findIndex: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findIndex
+	if (selector && annotationId && layer) {
+		const sameTarget = annotations.filter((a) => a.selector === selector)
+		const thisIndex = sameTarget.findIndex((a) => a.id === annotationId)
+
+		// gives me part of the array i need: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/slice
+		sameTarget.slice(0, thisIndex).forEach((a) => {
+			// referenced this to help with calculation: https://stackoverflow.com/questions/10787782/full-height-of-a-html-element-div-including-border-padding-and-margin
+			const el = layer.querySelector(`.notate-note[data-id="${a.id}"]`)
+			if (el) top += el.offsetHeight + gap
+		})
 	}
+
+	return { top, left }
 }
 
 // outline the targeted element
@@ -366,7 +382,7 @@ const renderAnnotation = (annotation) => {
 	const target = document.querySelector(annotation.selector)
 	if (!target) return
 
-	const position = getNotePosition(target)
+	const position = getNotePosition(target, annotation.selector, annotation.id)
 
 	highlightTarget(annotation.selector)
 
@@ -602,17 +618,19 @@ const onKeydown = (event) => {
 // HTMLElement.dataset: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
 // CSS logical properties: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_logical_properties_and_values
 // grabs the saved id off the note, re-finds the original target, then updates the note position
+// passes selector so getNotePosition can stack siblings that have already been repositioned above it
 const repositionNote = (note) => {
 	const id = note.dataset.id
 	const annotation = getAnnotationById(id)
 	const target = document.querySelector(annotation.selector)
-	const position = getNotePosition(target)
+	const position = getNotePosition(target, annotation.selector, annotation.id)
 
 	note.style.insetBlockStart = `${position.top}px`
 	note.style.insetInlineStart = `${position.left}px`
 }
 
 // all notes reposition together on scroll and resize
+// repositions in DOM order so each note measures already-updated siblings above it for correct stacking
 // Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
 // NodeList.forEach: https://developer.mozilla.org/en-US/docs/Web/API/NodeList/forEach
 // only runs while annotating so this isn't doing extra work all the time
