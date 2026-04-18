@@ -58,7 +58,6 @@ header {
 		font-weight: 600;
 	}
 
-	/* create/start-annotating icon button */
 	button {
 		inline-size: auto;
 		padding: 0;
@@ -115,6 +114,28 @@ button {
 	gap: var(--space-xs);
 	margin-block-start: var(--space-xs);
 	cursor: default;
+
+	header {
+		display: flex;
+		justify-content: flex-end;
+		padding: 0;
+		gap: 0;
+
+		button {
+			inline-size: auto;
+			padding: 0;
+			border: none;
+			background-color: transparent;
+			color: var(--color-border);
+			font-size: var(--fs-regular);
+			cursor: default;
+
+			&:hover {
+				background-color: transparent;
+				color: var(--color-text);
+			}
+		}
+	}
 
 	ul {
 		display: flex;

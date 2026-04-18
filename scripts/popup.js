@@ -151,9 +151,20 @@ const onStartAnnotatingClick = async () => {
 	window.close()
 }
 
+// clear all annotations across every saved page at once
+// chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
+const clearAllAnnotations = async () => {
+	await chrome.storage.local.remove(storageKey)
+	renderAnnotatedPages()
+}
+
 // initial popup load
 const initPopup = () => {
 	annotateButton.addEventListener('click', onStartAnnotatingClick)
+
+	const clearAllButton = document.querySelector('[data-action="clear-all"]')
+	clearAllButton.addEventListener('click', clearAllAnnotations)
+
 	renderAnnotatedPages()
 }
 
