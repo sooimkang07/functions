@@ -101,6 +101,8 @@ html {
 	box-shadow: var(--shadow-md);
 	box-sizing: border-box;
 	background-color: var(--color-note);
+	border: none;
+	outline: none;
 
 	form {
 		block-size: 100%;
