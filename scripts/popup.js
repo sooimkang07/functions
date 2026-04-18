@@ -43,9 +43,9 @@ const getSortedPages = (storedAnnotations) => {
 
 // single vs plural annotation labeling
 // conditional operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Conditional_operator
-const getAnnotationLabel = (count) => {
-	return count === 1 ? 'notation' : 'notations'
-}
+// const getAnnotationLabel = (count) => {
+// 	return count === 1 ? 'notation' : 'notations'
+// }
 
 // turn one saved page object into one list item in the popup
 // get the favicon from google's favicon service using just the page origin
@@ -54,7 +54,6 @@ const getAnnotationLabel = (count) => {
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
 const createPageItem = (page) => {
 	const count = page.annotations.length
-	const annotationLabel = getAnnotationLabel(count)
 	const origin = new URL(page.url).origin
 	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=16`
 
@@ -63,7 +62,7 @@ const createPageItem = (page) => {
 			<button class="popup-page-button" type="button" data-url="${page.url}">
 				<img class="popup-page-favicon" src="${favicon}" alt="" width="8" height="8">
 				<span class="popup-page-title">${page.title || page.url}</span>
-				<span class="popup-page-count">${count} ${annotationLabel}</span>
+				<span class="popup-page-count">(${count})</span>
 			</button>
 		</li>
 	`

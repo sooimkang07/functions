@@ -175,6 +175,7 @@ button {
 
 		span:last-of-type {
 			flex-shrink: 0;
+			color: var(--color-border);
 		}
 	}
 }
