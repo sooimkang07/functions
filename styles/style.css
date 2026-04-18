@@ -25,6 +25,7 @@ html, body {
 	min-block-size: 18rem;
 	background: var(--color-ui);
 	cursor: default;
+	scrollbar-width: none;
 }
 
 body {
