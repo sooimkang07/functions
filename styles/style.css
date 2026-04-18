@@ -24,6 +24,7 @@ html, body {
 	inline-size: 22rem;
 	min-block-size: 18rem;
 	background: var(--color-ui);
+	cursor: default;
 }
 
 body {
@@ -32,6 +33,7 @@ body {
 	border: none;
 	outline: none;
 	box-shadow: none;
+	cursor: default;
 }
 
 header {
@@ -40,6 +42,7 @@ header {
 	gap: var(--space-xs);
 	padding-block: var(--space-sm);
 	padding-inline: var(--space-md);
+	cursor: default;
 
 	img:not(button img) {
 		flex-shrink: 0;
@@ -61,7 +64,7 @@ header {
 		padding: 0;
 		border: none;
 		background: none;
-		cursor: pointer;
+		cursor: default;
 		display: flex;
 		align-items: center;
 		flex-shrink: 0;
@@ -84,6 +87,7 @@ main {
 	inline-size: 100%;
 	padding: var(--space-md);
 	box-sizing: border-box;
+	cursor: default;
 }
 
 button {
@@ -94,7 +98,7 @@ button {
 	border-width: 1px;
 	border-color: var(--color-border);
 	background-color: var(--color-surface);
-	cursor: pointer;
+	cursor: default;
 	color: var(--color-text);
 	text-align: center;
 	font-size: var(--fs-large);
@@ -110,6 +114,7 @@ button {
 	flex-direction: column;
 	gap: var(--space-xs);
 	margin-block-start: var(--space-xs);
+	cursor: default;
 
 	ul {
 		display: flex;
@@ -117,6 +122,7 @@ button {
 		padding: 0;
 		margin: 0;
 		list-style: none;
+		cursor: default;
 	}
 
 	li button {
@@ -132,6 +138,7 @@ button {
 		inline-size: calc(100% + (var(--space-md) * 2));
 		font-weight: 400;
 		font-size: var(--fs-regular);
+		cursor: default;
 
 		img {
 			flex-shrink: 0;
@@ -154,4 +161,5 @@ button {
 .popup-empty-state {
 	font-family: var(--font-ui);
 	font-size: var(--fs-regular);
+	cursor: default;
 }

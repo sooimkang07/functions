@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
+html {
+	font-size: 16px !important;
+}
+
 :root {
 	--font-note: "Gaegu", sans-serif;
 	--font-ui: "Inter", sans-serif;
@@ -42,12 +46,14 @@
 html {
 	&.is-annotating {
 		*, *:hover {
-			cursor: crosshair;
-		}
-		
-		#notate-toolbar *, #notate-toolbar *:hover,
-		#notate-modal *, #notate-modal *:hover {
 			cursor: pointer;
+		}
+
+		#notate-toolbar *, #notate-toolbar *:hover,
+		#notate-modal *, #notate-modal *:hover,
+		.notate-note, .notate-note *,
+		.notate-note:hover, .notate-note *:hover {
+			cursor: default;
 		}
 
 		*:hover:not(.is-annotated):not(#notate-modal):not(#notate-modal *):not(.notate-note):not(.notate-note *):not(#notate-toolbar):not(#notate-toolbar *) {
@@ -58,6 +64,9 @@ html {
 }
 
 #notate-toolbar {
+	/* so it doesn't inherit styles from the page: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/all */
+	all: initial;
+	font-size: var(--fs-ui);
 	position: fixed;
 	inset-block-start: var(--inline-offset-toolbar);
 	inset-inline-end: var(--inline-offset-toolbar);
@@ -66,10 +75,9 @@ html {
 	gap: var(--space-xs);
 	padding-block: var(--space-xs);
 	padding-inline: var(--space-sm);
-	background: transparent;
+	background-color: transparent;
 	color: var(--color-text);
 	font-family: var(--font-ui);
-	font-size: var(--fs-ui);
 	inline-size: max-content;
 	max-inline-size: calc(100vw - (var(--space-md) * 2));
 	z-index: var(--toolbar-z);
@@ -101,11 +109,17 @@ html {
 }
 
 #notate-modal {
+	/* so it doesn't inherit styles from the page: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/all */
+	all: initial;
+	font-size: var(--fs-ui);
+	position: fixed;
+	inset-block-start: 50%;
+	inset-inline-start: 50%;
+	translate: -50% -50%;
 	inline-size: min(var(--inline-size-modal), calc(100vw - var(--space-lg)));
 	aspect-ratio: 1 / 1;
 	/* max-inline-size: calc(100vw - var(--space-lg)); */
 	padding: var(--space-md);
-	border-style: none;
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-md);
 	box-sizing: border-box;
@@ -113,15 +127,14 @@ html {
 	border: none;
 	outline: none;
 
+	&:not([open]) {
+		display: none;
+	}
+
 	form {
 		block-size: 100%;
 		display: flex;
 		flex-direction: column;
-	}
-
-	textarea,
-	button {
-		box-sizing: border-box;
 	}
 
 	textarea {
@@ -131,11 +144,12 @@ html {
 		min-inline-size: 0;
 		min-block-size: 8rem;
 		padding: var(--space-xs);
+		box-sizing: border-box;
 		resize: none;
-		background: var(--color-note);
+		background-color: var(--color-note);
 		font-family: var(--font-note);
 		font-size: var(--fs-note);
-		color: black;
+		color: var(--color-text);
 		border: none;
 		box-shadow: none;
 		appearance: none;
@@ -144,7 +158,6 @@ html {
 		&:focus-visible {
 			outline: none;
 			border: none;
-			box-shadow: none;
 		}
 	}
 
@@ -163,6 +176,7 @@ html {
 	button {
 		padding-block: var(--space-xs);
 		padding-inline: var(--space-sm);
+		box-sizing: border-box;
 		border: var(--border-ui);
 		border-radius: var(--radius-md);
 		background-color: var(--color-ui);
@@ -193,8 +207,7 @@ html {
 	position: absolute;
 	inline-size: min(var(--inline-size-note), calc(100vw - (var(--space-md) * 2)));
 	padding: var(--space-sm);
-	background: var(--color-note);
-	border: var(--border-ui);
+	background-color: var(--color-note);
 	border-radius: var(--radius-sm);
 	box-shadow: var(--shadow-sm);
 	color: var(--color-text);
@@ -203,6 +216,8 @@ html {
 	box-sizing: border-box;
 	overflow-wrap: anywhere;
 	word-break: break-word;
+	border: none;
+	outline: none;
 
 	&:hover {
 		background-color: var(--color-note-hover);
@@ -223,12 +238,13 @@ html {
 		inset-block-start: var(--space-2xs);
 		inset-inline-end: var(--space-2xs);
 		padding: var(--space-2xs);
-		border: 0;
-		background: transparent;
+		background-color: transparent;
 		cursor: pointer;
-		font: var(--font-note);
+		font-family: var(--font-note);
 		line-height: 1;
 		color: var(--color-text);
+		border: none;
+		outline: none;
 	}
 }
 
