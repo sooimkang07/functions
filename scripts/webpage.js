@@ -404,12 +404,17 @@ const renderAnnotation = (annotation) => {
 
 // all saved annotations to render back onto the page together
 // shows the layer, clears old note markup, re-renders every item in annotations
+// then again so stacked note heights are accurate
 const renderAllAnnotations = () => {
 	showLayer()
 	clearRenderedAnnotations()
 
 	annotations.forEach((annotation) => {
 		renderAnnotation(annotation)
+	})
+
+	requestAnimationFrame(() => {
+		repositionAnnotations()
 	})
 }
 
@@ -660,40 +665,49 @@ const scrollToFirstAnnotation = () => {
 
 // keep the enter-annotation-mode behavior in one function so initial load and popup messages do the same thing
 // scroll param controls whether to jump to the first annotation—only true when coming from the popup
+// selector scrolls to that specific annotation instead of the first one
 // if the tab is hidden when this runs, wait for it to become visible before scrolling so it doesn't get lost
 // Document.visibilityState: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState
 // visibilitychange event: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
-const enterAnnotationMode = async (scroll = false) => {
+// Element.scrollIntoView: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
+const enterAnnotationMode = async (scroll = false, selector = null) => {
 	await loadAnnotations()
 	startAnnotating()
 
 	if (!scroll) return
 
+	const scrollTarget = () => {
+		const target = selector
+			? document.querySelector(selector)
+			: document.querySelector(annotations[0]?.selector)
+
+		if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+	}
+
 	if (document.visibilityState === 'visible') {
-		requestAnimationFrame(() => {
-			scrollToFirstAnnotation()
-		})
+		requestAnimationFrame(scrollTarget)
 	} else {
-		document.addEventListener('visibilitychange', () => {
-			scrollToFirstAnnotation()
-		}, { once: true })
+		document.addEventListener('visibilitychange', scrollTarget, { once: true })
 	}
 }
 
 // when page loads, pull this page's annotations from shared extension storage
 // then check if the popup flagged this url to auto-enter annotation mode
+// also checks for a selector in case a specific annotation was clicked in the popup
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
 // async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
 const initAnnotations = async () => {
 	await loadAnnotations()
 
-	const stored = await chrome.storage.local.get('notate-pending-url')
+	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector'])
 	const pendingUrl = stored['notate-pending-url']
 
 	if (pendingUrl !== location.href) return
 
-	await chrome.storage.local.remove('notate-pending-url')
-	enterAnnotationMode(true)
+	await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector'])
+
+	const pendingSelector = stored['notate-pending-selector'] || null
+	enterAnnotationMode(true, pendingSelector)
 }
 
 initAnnotations()
@@ -713,11 +727,12 @@ window.addEventListener('resize', repositionAnnotations)
 
 
 // listen for popup messages like start annotating or clear this page
+// runs a selector through for already-open tabs so they scroll to the right annotation
 // chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 chrome.runtime.onMessage.addListener((message) => {
 	const runtimeActions = {
 		'enter-annotation-mode': () => enterAnnotationMode(false),
-		'enter-annotation-mode-scroll': () => enterAnnotationMode(true),
+		'enter-annotation-mode-scroll': () => enterAnnotationMode(true, message.selector || null),
 		'toggle-annotate-mode': toggleAnnotating,
 		'clear-annotations': clearAnnotations
 	}

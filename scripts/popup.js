@@ -52,18 +52,34 @@ const getSortedPages = (storedAnnotations) => {
 // googled: https://www.google.com/search?q=grab+favicon+of+url+vanilla+js&sca_esv=298796d921a32d3f&rlz=1C5CHFA_enUS976US983&biw=1710&bih=898&sxsrf=ANbL-n5Bx71MbsMdyv_qO5uiL-1PgfeaDQ%3A1776223936243&ei=wAbfaeLHDqSp5NoPxuzUgQc&ved=0ahUKEwjip4vm9e6TAxWkFFkFHUY2NXAQ4dUDCBM&uact=5&oq=grab+favicon+of+url+vanilla+js&gs_lp=Egxnd3Mtd2l6LXNlcnAiHmdyYWIgZmF2aWNvbiBvZiB1cmwgdmFuaWxsYSBqczIFECEYoAEyBRAhGKABMgUQIRigATIFECEYoAEyBRAhGKABMgUQIRirAkjhAlC4AVi4AXABeAGQAQCYAV2gAV2qAQExuAEDyAEA-AEBmAICoAJlwgIKEAAYRxjWBBiwA5gDAIgGAZAGCJIHATKgB6AFsgcBMbgHY8IHAzAuMsgHAoAIAQ&sclient=gws-wiz-serp, followed to this: https://stackoverflow.com/questions/10282939/how-to-get-favicons-url-from-a-generic-webpage-in-javascript 
 // URL: https://developer.mozilla.org/en-US/docs/Web/API/URL/URL
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
+// each annotation is a clickable button with its selector saved in data-selector so I can scroll right to it
+// reversed so the most recently added annotation shows up at the top of the dropdown: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse
 const createPageItem = (page) => {
 	const count = page.annotations.length
 	const origin = new URL(page.url).origin
 	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=16`
+	const annotationItems = [...page.annotations].reverse().map((a) => `
+		<li>
+			<button class="popup-annotation-item" type="button" data-url="${page.url}" data-selector="${a.selector}">${a.text}</button>
+		</li>
+	`).join('')
+	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join
 
 	return `
-		<li>
-			<button class="popup-page-button" type="button" data-url="${page.url}">
-				<img class="popup-page-favicon" src="${favicon}" alt="" width="8" height="8">
-				<span class="popup-page-title">${page.title || page.url}</span>
-				<span class="popup-page-count">(${count})</span>
-			</button>
+		<li class="popup-page-item">
+			<div class="popup-page-row">
+				<button class="popup-page-button" type="button" data-url="${page.url}">
+					<img class="popup-page-favicon" src="${favicon}" alt="" width="8" height="8">
+					<span class="popup-page-title">${page.title || page.url}</span>
+				</button>
+				<button class="popup-page-toggle" type="button" aria-label="Toggle annotations">
+					<span class="popup-page-count">(${count})</span>
+					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+				</button>
+			</div>
+			<ul class="popup-annotation-list" hidden>
+				${annotationItems}
+			</ul>
 		</li>
 	`
 }
@@ -95,10 +111,15 @@ const setPendingAnnotationUrl = async (url) => {
 // if the page is already open somewhere, tell background.js to switch to it
 // tried doing the window/tab focus directly but couldn't because chrome blocks it while the popup is still open
 // if it's not open, just create a new tab and let the pending url in storage handle the rest
+// selector gets saved to storage so webpage.js can scroll to that specific annotation
 // chrome.runtime.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 // chrome.tabs.create: https://developer.chrome.com/docs/extensions/reference/api/tabs
-const activateOrOpenPage = async (url) => {
+const activateOrOpenPage = async (url, selector = null) => {
 	const matchingTab = await findMatchingTab(url)
+
+	if (selector) {
+		await chrome.storage.local.set({ 'notate-pending-selector': selector })
+	}
 
 	if (matchingTab?.id) {
 		await setPendingAnnotationUrl(url)
@@ -117,12 +138,26 @@ const activateOrOpenPage = async (url) => {
 
 // link each annotated page button
 // Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
+// page button navigates to the page, arrow toggles the dropdown, annotation items jump to that specific one
 const bindPageButtons = () => {
-	const buttons = list.querySelectorAll('button')
-
-	buttons.forEach((button) => {
+	list.querySelectorAll('.popup-page-button').forEach((button) => {
 		button.addEventListener('click', async () => {
 			await activateOrOpenPage(button.dataset.url)
+		})
+	})
+
+	list.querySelectorAll('.popup-page-toggle').forEach((toggle) => {
+		const dropdown = toggle.closest('.popup-page-item').querySelector('.popup-annotation-list')
+
+		toggle.addEventListener('click', () => {
+			dropdown.hidden = !dropdown.hidden
+			toggle.classList.toggle('is-open', !dropdown.hidden)
+		})
+	})
+
+	list.querySelectorAll('.popup-annotation-item').forEach((button) => {
+		button.addEventListener('click', async () => {
+			await activateOrOpenPage(button.dataset.url, button.dataset.selector)
 		})
 	})
 }
@@ -150,7 +185,7 @@ const onStartAnnotatingClick = async () => {
 	window.close()
 }
 
-// clear all annotations across every saved page at once
+// clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
 	await chrome.storage.local.remove(storageKey)
