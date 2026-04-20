@@ -22,14 +22,22 @@ const getActiveTab = async () => {
 }
 
 // send a message from the popup to webpage.js on the active tab
-// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
+// had to rabbit hole this because the popup wouldn't always work when i first loaded/clicked on it, so i first googled: https://www.google.com/search?q=chrome+extension+popup+click+does+nothing+first+time&rlz=1C5CHFA_enUS976US983&oq=chrome+extension+popup+click+does+nothing+first+time&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRigATIHCAYQIRirAtIBBzI3MWowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 then followed down 4th option of background script issue not listening quick enough, then googled: https://www.google.com/search?q=chrome+extension+content+script+not+ready+first+message&rlz=1C5CHFA_enUS976US983&oq=chrome+extension+content+script+not+ready+first+message&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRifBdIBBzIyNWowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 then followed "recommended implementation pattern" section and clicked on this link: https://groups.google.com/a/chromium.org/g/chromium-extensions/c/st_Nh7j3908. also looked up my console error and found this: https://romanisthere.github.io/posts/receiving-end/. then googled this from those forum references: https://www.google.com/search?q=chrome.tabs.sendMessage+try+catch+error+handling&rlz=1C5CHFA_enUS976US983&oq=chrome.tabs.sendMessage+try+catch+error+handling&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRiPAtIBBzEzNmowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 and followed "promise-based handling" first option for try/catch function. then found this google group forum to help with the storage fallback: https://groups.google.com/a/chromium.org/g/chromium-extensions/c/BH5_4OKxM3s 
 const sendActionToActiveTab = async (action) => {
 	const tab = await getActiveTab()
 	if (!tab?.id) return
 
 	await setPendingAnnotationUrl(tab.url)
-	await chrome.tabs.sendMessage(tab.id, { action })
-	await chrome.storage.local.remove('notate-pending-url')
+
+	try {
+		// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
+		await chrome.tabs.sendMessage(tab.id, { action })
+		// Only remove if message was received
+		await chrome.storage.local.remove('notate-pending-url')
+	} catch {
+		// Content script not ready yet so leave pending URL in storage
+		// webpage.js will pick it up with initAnnotations() once it loads
+	}
 }
 
 // sort saved pages so the most recent ones show first in popup
