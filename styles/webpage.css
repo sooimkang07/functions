@@ -1,47 +1,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
+/* ---------------ROOT VARIABLES--------------- */
+
 html {
 	font-size: 16px !important;
+	/* have to use !important here to override sites that set their root much smaller so as not to shrink the text*/
 }
 
 :root {
-	--font-note: "Gaegu", sans-serif;
 	--font-ui: "Inter", sans-serif;
+	--font-note: "Gaegu", sans-serif;
 
-	--fs-note: 2rem;
-	--fs-ui: 1rem;
+	--fs-regular: 0.875rem;
+	--fs-note: 1.6rem;
+
+	--fw-medium: 500;
 
 	--space-2xs: 0.25rem;
 	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
 	--space-md: 1rem;
-	--space-lg: 2rem;
+	--space-lg: 1.5rem;
+	--space-xl: 2rem;
 
-	--inline-size-note: 12rem;
-	--inline-size-modal: 20rem;
-	--inline-offset-toolbar: 1rem;
+	--radius-sm: 6px;
+	--radius-md: 10px;
 
-	--radius-sm: 0.25rem;
-	--radius-md: 0.5rem;
-
-	--border-ui: 1px solid rgba(238, 238, 238, 1);
-
+	--color-text: #272727;
 	--color-note: #ffe992;
 	--color-note-hover: #fff5cd;
-	--color-ui: white;
-	--color-ui-hover: #EEEEEE;
-	--color-text: black;
-	--color-overlay: rgba(255, 235, 59, 0.08);
+	--color-note-accent:#e6c200;
+	--color-bg: #ffffff;
+	--color-hover: #f2f2f2;
+	--color-border: #dadce0;
 
-	--shadow-sm: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
-	--shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+	--border-ui: 1px solid var(--color-border);
 
-	--outline-annotating: 3px solid var(--color-note);
+	--shadow-sm: 0 1px 2px rgba(60,64,67,.10), 0 1px 3px rgba(60,64,67,.08);
+	--shadow-md: 0 2px 8px rgba(60,64,67,.12), 0 1px 3px rgba(60,64,67,.08);
+
+	--outline-annotating: 2px solid var(--color-note-accent);
+	--lh-note: 1;
+
+	--ease: cubic-bezier(.2,0,0,1);
+	--duration: 120ms;
+	--duration-md: 180ms;
+
+	--inline-size-note: 18rem;
+	--inline-size-modal: 20rem;
+	--inline-offset-toolbar: 1rem;
 
 	--layer-z: 1000;
 	--note-z: 1001;
 	--toolbar-z: 1000000000;
 }
+
+/* ---------------ANNOTATING MODE--------------- */
 
 html {
 	&.is-annotating {
@@ -59,24 +73,37 @@ html {
 		*:hover:not(.is-annotated):not(#notate-modal):not(#notate-modal *):not(.notate-note):not(.notate-note *):not(#notate-toolbar):not(#notate-toolbar *) {
 			outline: var(--outline-annotating);
 			outline-offset: 0.125rem;
+			border-radius: var(--radius-sm);
 		}
 	}
 }
 
+/* ---------------HOVER FILL IN ANNOTATING MODE--------------- */
+
+.notate-hover {
+	background-color: color-mix(in srgb, var(--color-note) 30%, transparent);
+}
+
+#notate-img-overlay {
+	position: fixed;
+	background: color-mix(in srgb, var(--color-note) 30%, transparent);
+	pointer-events: none;
+	z-index: var(--toolbar-z);
+}
+
+/* ---------------TOOLBAR BUTTONS--------------- */
+
 #notate-toolbar {
 	/* so it doesn't inherit styles from the page: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/all */
 	all: initial;
-	font-size: var(--fs-ui);
+	font-size: var(--fs-regular);
 	position: fixed;
 	inset-block-start: var(--inline-offset-toolbar);
 	inset-inline-end: var(--inline-offset-toolbar);
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
-	padding-block: var(--space-xs);
-	padding-inline: var(--space-sm);
-	background-color: transparent;
-	color: var(--color-text);
+	padding: var(--space-xs);
 	font-family: var(--font-ui);
 	inline-size: max-content;
 	max-inline-size: calc(100vw - (var(--space-md) * 2));
@@ -93,37 +120,42 @@ html {
 		padding-block: var(--space-xs);
 		padding-inline: var(--space-sm);
 		border: var(--border-ui);
-		border-radius: var(--radius-md);
-		background-color: var(--color-ui);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg);
 		color: var(--color-text);
 		cursor: pointer;
 		font-family: var(--font-ui);
-		font-size: var(--fs-ui);
-		line-height: 1.2;
+		font-size: var(--fs-regular);
+		font-weight: var(--fw-medium);
+		line-height: 1.4;
 		white-space: nowrap;
 
 		&:hover {
-			background-color: var(--color-ui-hover);
+			background: var(--color-hover);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-note-accent);
+			outline-offset: 2px;
 		}
 	}
 }
 
+/* ---------------MODAL ANNOTATION--------------- */
+
 #notate-modal {
-	/* so it doesn't inherit styles from the page: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/all */
 	all: initial;
-	font-size: var(--fs-ui);
+	font-size: var(--fs-regular);
 	position: fixed;
 	inset-block-start: 50%;
 	inset-inline-start: 50%;
 	translate: -50% -50%;
-	inline-size: min(var(--inline-size-modal), calc(100vw - var(--space-lg)));
+	inline-size: min(var(--inline-size-modal), calc(100vw - var(--space-xl)));
 	aspect-ratio: 1 / 1;
-	/* max-inline-size: calc(100vw - var(--space-lg)); */
-	padding: var(--space-md);
+	padding: var(--space-sm);
 	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-md);
 	box-sizing: border-box;
-	background-color: var(--color-note);
+	background: var(--color-note);
 	border: none;
 	outline: none;
 
@@ -135,6 +167,7 @@ html {
 		block-size: 100%;
 		display: flex;
 		flex-direction: column;
+		gap: var(--space-xs);
 	}
 
 	textarea {
@@ -146,13 +179,20 @@ html {
 		padding: var(--space-xs);
 		box-sizing: border-box;
 		resize: none;
-		background-color: var(--color-note);
+		background: transparent;
 		font-family: var(--font-note);
 		font-size: var(--fs-note);
+		line-height: var(--lh-note);
 		color: var(--color-text);
 		border: none;
 		box-shadow: none;
 		appearance: none;
+		scrollbar-width: none;
+
+		&::selection {
+			background: Highlight;
+			color: HighlightText;
+		}
 
 		&:focus,
 		&:focus-visible {
@@ -178,19 +218,27 @@ html {
 		padding-inline: var(--space-sm);
 		box-sizing: border-box;
 		border: var(--border-ui);
-		border-radius: var(--radius-md);
-		background-color: var(--color-ui);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg);
 		color: var(--color-text);
 		cursor: pointer;
 		font-family: var(--font-ui);
-		font-size: var(--fs-ui);
-		line-height: 1.2;
+		font-size: var(--fs-regular);
+		font-weight: var(--fw-medium);
+		line-height: 1.4;
 
 		&:hover {
-			background-color: var(--color-ui-hover);
+			background: var(--color-hover);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-note-accent);
+			outline-offset: 2px;
 		}
 	}
 }
+
+/* ---------------ANNOTATION LAYER--------------- */
 
 #notate-layer {
 	position: absolute;
@@ -203,13 +251,14 @@ html {
 	}
 }
 
+/* ---------------SAVED ANNOTATIONS--------------- */
+
 .notate-note {
 	position: absolute;
 	inline-size: min(var(--inline-size-note), calc(100vw - (var(--space-md) * 2)));
 	padding: var(--space-sm);
-	background-color: var(--color-note);
+	background: var(--color-note);
 	border-radius: var(--radius-sm);
-	box-shadow: var(--shadow-sm);
 	color: var(--color-text);
 	pointer-events: auto;
 	z-index: var(--note-z);
@@ -220,7 +269,7 @@ html {
 	outline: none;
 
 	&:hover {
-		background-color: var(--color-note-hover);
+		background: var(--color-note-hover);
 	}
 
 	p {
@@ -228,6 +277,7 @@ html {
 		padding-inline-end: 1.5rem;
 		font-family: var(--font-note);
 		font-size: var(--fs-note);
+		line-height: var(--lh-note);
 		color: var(--color-text);
 		overflow-wrap: anywhere;
 		word-break: break-word;
@@ -238,17 +288,50 @@ html {
 		inset-block-start: var(--space-2xs);
 		inset-inline-end: var(--space-2xs);
 		padding: var(--space-2xs);
-		background-color: transparent;
+		background: transparent;
 		cursor: pointer;
 		font-family: var(--font-note);
 		line-height: 1;
 		color: var(--color-text);
 		border: none;
 		outline: none;
+		opacity: 0;
+
+		&:hover {
+			opacity: 1;
+		}
+	}
+
+	&:hover .notate-delete {
+		opacity: 0.5;
 	}
 }
+
+/* ---------------ANNOTATED OUTLINE--------------- */
 
 .is-annotated {
 	outline: var(--outline-annotating);
 	outline-offset: 0.125rem;
+	border-radius: var(--radius-sm);
+}
+
+/* ---------------ACCESSIBILITY--------------- */
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		transition: none;
+		animation: none;
+	}
+}
+
+@media (prefers-contrast: more) {
+	:root {
+		--outline-annotating: 3px solid #b8860b;
+		--color-note-accent: #b8860b;
+	}
+
+	.notate-toolbar-button,
+	#notate-modal button {
+		outline: 1px solid var(--color-border);
+	}
 }

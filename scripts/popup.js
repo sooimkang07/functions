@@ -87,7 +87,7 @@ const createPageItem = (page) => {
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 const renderEmptyState = () => {
 	list.innerHTML = `
-		<li class="popup-empty-state">No notations yet</li>
+		<li class="popup-empty-state">No Notated pages</li>
 	`
 }
 

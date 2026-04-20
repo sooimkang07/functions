@@ -164,7 +164,7 @@ const createToolbar = () => {
 	toolbar.innerHTML = `
 		<div class="notate-toolbar-group">
 			<button class="notate-toolbar-button" type="button" data-action="clear">
-				Clear all notations
+				Clear all
 			</button>
 			<button class="notate-toolbar-button" type="button" data-action="exit">
 				Exit Notate
@@ -721,6 +721,48 @@ document.addEventListener('click', onPageClick, true)
 document.addEventListener('click', onNoteClick, true)
 document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
+
+// add hover fill to only the exact element under the cursor not with CSS :hover because couldn't keep the hover state to just the hovered element. it was spreading to the whole parent if the hovered element didn't have its own background.
+// closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
+const blockedHoverSelectors = ['#notate-modal', '#notate-toolbar', '.notate-note']
+const isBlockedHoverTarget = (el) => blockedHoverSelectors.some((s) => el.closest(s))
+
+// overlay a temporary yellow div over images on hover since background-color doesn't work over <img>
+let hoverOverlay = null
+
+document.addEventListener('mouseover', (event) => {
+	if (!isAnnotating || isBlockedHoverTarget(event.target)) return
+
+	// check for if it's an image because background-color wasn't working on img elements, so i needed to make a separate hover state for them that puts a yellow overlay div on top of the image instead of trying to change the image's background-color
+	// googled: "how to check if element is an image javascript" and found tagName property as second option which took me to this: https://www.encodedna.com/javascript/check-if-element-is-an-image-using-javascript-tagname-property.htm#:~:text=Let%20us%20assume%20I%20have,the%20ID%20of%20each%20image.
+	if (event.target.tagName === 'IMG') {
+		// used same getBoundingClientRect from getNotePosition to position the hoverOverlay exactly on top of the image, then add it to the body so it shows up on top of the image with a yellow background
+		const rect = event.target.getBoundingClientRect()
+		hoverOverlay = document.createElement('div')
+		// id styled in webpage.css
+		hoverOverlay.id = 'notate-img-overlay'
+		hoverOverlay.style.insetBlockStart = `${rect.top}px`
+		hoverOverlay.style.insetInlineStart = `${rect.left}px`
+		hoverOverlay.style.inlineSize = `${rect.width}px`
+		hoverOverlay.style.blockSize = `${rect.height}px`
+		// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+		document.body.append(hoverOverlay)
+	} else {
+		event.target.classList.add('notate-hover')
+	}
+}, true)
+
+// mouseover/mouseout: https://developer.mozilla.org/en-US/docs/Web/API/Element/mouseover_event
+document.addEventListener('mouseout', (event) => {
+	if (!isAnnotating) return
+
+	if (hoverOverlay) {
+		hoverOverlay.remove()
+		hoverOverlay = null
+	} else {
+		event.target.classList.remove('notate-hover')
+	}
+}, true)
 
 window.addEventListener('scroll', repositionAnnotations)
 window.addEventListener('resize', repositionAnnotations)

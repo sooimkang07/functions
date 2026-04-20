@@ -1,169 +1,216 @@
 @import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
+/* ---------------ROOT VARIABLES--------------- */
+
 :root {
 	--font-ui: "Inter", sans-serif;
+	--font-note: "Gaegu", sans-serif;
 
-	--fs-large: 1.1rem;
-	--fs-regular: .9rem;
+	--fs-sm:  0.75rem;
+	--fs-regular: 0.875rem;
+	--fs-large: 1rem;
+	--fs-xl: 1.5rem;
 
+	--fw-regular: 400;
+	--fw-medium: 500;
+	--fw-semibold: 600;
+	--fw-bold: 700;
+
+	--space-2xs: 0.25rem;
 	--space-xs: 0.5rem;
 	--space-sm: 0.75rem;
 	--space-md: 1rem;
+	--space-lg: 1.5rem;
+	--space-xl: 2rem;
 
-	--color-text: black;
+	--radius-sm: 6px;
+	--radius-md: 10px;
+
+	--color-text: #272727;
+	--color-text-secondary: #474747;
+	--color-text-tertiary: #9A9FA6;
+	--color-bg: #ffffff;
+	--color-hover: #f2f2f2;
+	--color-border: #dadce0;
 	--color-note: #ffe992;
-	--color-surface: white;
-	--color-ui: white;
-	--color-hover: #EEEEEE;
-	--color-border: #ccc;
+	--color-note-hover: #fff5cd;
+	--color-note-accent: #e6c200;
+	--color-clear: #c0392b;
+
+	--border-ui: 1px solid var(--color-border);
+
+	--shadow-sm: 0 1px 2px rgba(60,64,67,.10), 0 1px 3px rgba(60,64,67,.08);
+	--shadow-md: 0 2px 8px rgba(60,64,67,.12), 0 1px 3px rgba(60,64,67,.08);
+
+	--ease: cubic-bezier(.2,0,0,1);
+	--duration: 120ms;
+	--duration-md: 180ms;
+
+	--popup-inline-size: 23rem;
+	--toggle-inline-size: 4rem;
+	--annotation-indent: calc(var(--space-sm) + 1rem + var(--space-xs));
 }
+
+/* ---------------BODY--------------- */
 
 html, body {
 	margin: 0;
 	padding: 0;
-	inline-size: 22rem;
-	min-block-size: 18rem;
-	background: var(--color-ui);
+	inline-size: var(--popup-inline-size);
+	min-block-size: 0;
+	background: var(--color-bg);
+	color-scheme: light;
 	cursor: default;
 	scrollbar-width: none;
 }
 
 body {
-	display: block;
-	background: var(--color-ui);
-	border: none;
-	outline: none;
-	box-shadow: none;
-	cursor: default;
+	font-family: var(--font-ui);
+	font-size: var(--fs-regular);
+	color: var(--color-text);
 }
+
+/* ---------------HEADER (LOGO, ANNOTATE BUTTON)--------------- */
 
 header {
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
-	padding-block: var(--space-sm);
-	padding-inline: var(--space-md);
-	cursor: default;
+	padding-inline: var(--space-sm);
+	padding-block: var(--space-xs);
+	border-block-end: var(--border-ui);
 
 	img:not(button img) {
 		flex-shrink: 0;
-		inline-size: 1.5rem;
-		block-size: 1.5rem;
+		inline-size: 1.25rem;
+		block-size: 1.25rem;
 	}
 
 	h1 {
 		flex: 1;
 		margin: 0;
-		font-family: var(--font-ui);
-		font-size: var(--fs-large);
-		font-weight: 600;
+		font-size: var(--fs-xl);
+		font-weight: var(--fw-semibold);
+		font-family: var(--font-note);
 	}
 
 	button {
-		inline-size: auto;
-		padding: 0;
-		border: none;
-		background: none;
-		cursor: default;
 		display: flex;
 		align-items: center;
+		justify-content: center;
+		padding: var(--space-xs);
+		cursor: pointer;
+		border-radius: 1000px;
+		background-color: transparent;
 		flex-shrink: 0;
+		transition:
+			background var(--duration) var(--ease),
+			color var(--duration) var(--ease);
 
-		img {
-			inline-size: 1.5rem;
-			block-size: 1.5rem;
+		svg {
+			inline-size: 1.125rem;
+			block-size: 1.125rem;
+			color: var(--color-text-secondary);
 		}
 
 		&:hover {
-			background: none;
+			background: var(--color-hover);
+			border-radius: 1000px;
+			color: var(--color-text);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-note-accent);
+			outline-offset: 2px;
 		}
 	}
 }
 
-main {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-	inline-size: 100%;
-	padding: var(--space-md);
-	box-sizing: border-box;
-	cursor: default;
-}
-
-button {
-	inline-size: 100%;
-	padding-block: var(--space-xs);
-	padding-inline: var(--space-sm);
-	border-style: solid;
-	border-width: 1px;
-	border-color: var(--color-border);
-	background-color: var(--color-surface);
-	cursor: default;
-	color: var(--color-text);
-	text-align: center;
-	font-size: var(--fs-large);
-	font-family: var(--font-ui);
-
-	&:hover {
-		background-color: var(--color-hover);
-	}
-}
+/* ---------------ANNOTATED PAGES SECTION (H2, CLEAR ALL BUTTON, UL)--------------- */
 
 .popup-section {
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-xs);
-	margin-block-start: var(--space-xs);
-	cursor: default;
 
 	header {
 		display: flex;
-		justify-content: flex-end;
-		padding: 0;
-		gap: 0;
+		justify-content: space-between;
+		align-items: center;
+		padding-block: var(--space-md);
+		padding-inline: var(--space-lg);
+		border: none;
+
+		h2 {
+			margin: 0;
+			font-weight: var(--fw-bold);
+		}
 
 		button {
-			inline-size: auto;
+			display: inline-flex;
+			align-items: center;
 			padding: 0;
 			border: none;
-			background-color: transparent;
-			color: var(--color-border);
-			font-size: var(--fs-regular);
-			cursor: default;
+			background: transparent;
+			color: var(--color-text-tertiary);
+			cursor: pointer;
+			font: var(--fw-medium) var(--fs-regular) var(--font-ui);
+			transition: color var(--duration) var(--ease);
 
 			&:hover {
-				background-color: transparent;
-				color: var(--color-text);
+				color: var(--color-clear);
+			}
+
+			&:focus-visible {
+				outline: 2px solid var(--color-note-accent);
+				outline-offset: 2px;
 			}
 		}
 	}
 
 	ul {
-		display: flex;
-		flex-direction: column;
-		padding: 0;
 		margin: 0;
+		padding-block-start: 0;
+		padding-inline: var(--space-sm);
 		list-style: none;
-		cursor: default;
-	}
-
-	.popup-page-row button {
-		cursor: default;
 	}
 }
+
+/* ---------------NO ANNOTATED PAGES--------------- */
 
 .popup-empty-state {
-	font-family: var(--font-ui);
+	padding-block: var(--space-lg);
+	padding-inline: var(--space-sm);	
 	font-size: var(--fs-regular);
-	cursor: default;
+	color: var(--color-text-tertiary);
+	text-align: start;
 }
+
+/* ---------------ANNOTATED PAGES LIST--------------- */
 
 .popup-page-row {
 	display: flex;
-	flex-direction: row;
-	align-items: center;
-	margin-inline: calc(var(--space-md) * -1);
-	overflow: hidden;
+	align-items: stretch;
+
+	.popup-page-button,
+	.popup-page-toggle {
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		font-family: var(--font-ui);
+		font-size: var(--fs-regular);
+		font-weight: var(--fw-regular);
+		border-radius: var(--radius-sm);
+		transition: background var(--duration) var(--ease);
+
+		&:hover {
+			background: var(--color-hover);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-note-accent);
+			outline-offset: -2px;
+		}
+	}
 
 	.popup-page-button {
 		flex: 1;
@@ -171,22 +218,15 @@ button {
 		display: flex;
 		align-items: center;
 		gap: var(--space-xs);
-		text-align: start;
-		border-style: none;
-		border-width: 0;
-		border-radius: 0;
 		padding-block: var(--space-xs);
-		padding-inline: var(--space-md);
-		font-weight: 400;
-		font-size: var(--fs-regular);
+		padding-inline: var(--space-sm);
 		color: var(--color-text);
-
-		&:hover {
-			background-color: var(--color-hover);
-		}
+		text-align: start;
 
 		img {
 			flex-shrink: 0;
+			inline-size: 1rem;
+			block-size: 1rem;
 		}
 
 		span {
@@ -198,26 +238,23 @@ button {
 
 	.popup-page-toggle {
 		display: flex;
-		flex-direction: row;
 		align-items: center;
-		gap: var(--space-xs);
-		inline-size: auto;
+		justify-content: flex-end;
+		gap: var(--space-2xs);
 		flex-shrink: 0;
-		border-style: none;
-		border-width: 0;
-		border-radius: 0;
-		padding-block: var(--space-xs);
-		padding-inline-start: var(--space-xs);
-		padding-inline-end: var(--space-md);
-		font-size: var(--fs-regular);
-		color: var(--color-text);
-
-		&:hover {
-			background-color: var(--color-hover);
-		}
+		inline-size: var(--toggle-inline-size);
+		padding-inline: var(--space-sm);
+		color: var(--color-text-tertiary);
+		transition:
+			background var(--duration) var(--ease),
+			color var(--duration) var(--ease);
 
 		svg {
-			transition: rotate 0.15s ease;
+			flex-shrink: 0;
+			inline-size: 1rem;
+			block-size: 1rem;
+			color: var(--color-text-tertiary);
+			transition: rotate var(--duration-md) var(--ease);
 		}
 
 		&.is-open svg {
@@ -226,41 +263,75 @@ button {
 	}
 }
 
-.popup-annotation-list[hidden] {
-	display: none;
-}
+/* ---------------ANNOTATION DROPDOWN--------------- */
 
 .popup-annotation-list {
-	display: flex;
-	flex-direction: column;
-	list-style: none;
-	padding: 0;
 	margin: 0;
-	overflow: hidden;
+	padding: 0;
+	list-style: none;
+
+	&[hidden] {
+		display: none;
+	}
 
 	.popup-annotation-item {
 		display: block;
-		text-align: start;
+		box-sizing: border-box;
+		inline-size: calc(100% - (var(--space-sm) * 2));
+		padding: var(--space-xs);
+		margin-inline: var(--space-md);
+		border: none;
+		border-radius: var(--radius-sm);
+		background: transparent;
 		font-family: var(--font-ui);
-		font-size: var(--fs-regular);
+		font-size: var(--fs-sm);
+		font-weight: var(--fw-regular);
 		color: var(--color-text);
-		padding-block: var(--space-xs);
-		padding-inline-start: calc(var(--space-md) * 2);
-		padding-inline-end: var(--space-md);
-		margin-inline: calc(var(--space-md) * -1);
-		inline-size: calc(100% + (var(--space-md) * 2));
-		border-style: none;
-		border-width: 0;
-		border-block-start-style: solid;
-		border-block-start-width: 1px;
-		border-block-start-color: var(--color-hover);
+		cursor: pointer;
+		text-align: start;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		box-sizing: border-box;
+		transition:
+			background var(--duration) var(--ease),
+			color var(--duration) var(--ease);
 
 		&:hover {
-			background-color: var(--color-hover);
+			background: var(--color-hover);
 		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-note-accent);
+			outline-offset: -2px;
+		}
+	}
+}
+
+#annotation-pages {
+	padding-block-end: var(--space-sm);
+}
+
+/* ---------------ACCESSIBILITY--------------- */
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		transition: none;
+		animation: none;
+	}
+}
+
+@media (prefers-contrast: more) {
+	:root {
+		--color-text-secondary: #202124;
+		--color-text-tertiary: #202124;
+		--color-border: #767676;
+		--color-hover: #e8eaed;
+	}
+
+	header button,
+	.popup-page-button,
+	.popup-page-toggle,
+	.popup-annotation-item {
+		outline: 1px solid var(--color-border);
 	}
 }
