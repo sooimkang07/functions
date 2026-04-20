@@ -41,6 +41,7 @@ html {
 
 	--outline-annotating: 2px solid var(--color-note-accent);
 	--lh-note: 1;
+	--lh-modal: 1.2;
 
 	--ease: cubic-bezier(.2,0,0,1);
 	--duration: 120ms;
@@ -182,7 +183,7 @@ html {
 		background: transparent;
 		font-family: var(--font-note);
 		font-size: var(--fs-note);
-		line-height: var(--lh-note);
+		line-height: var(--lh-modal);
 		color: var(--color-text);
 		border: none;
 		box-shadow: none;
