@@ -183,6 +183,8 @@ header {
 	font-size: var(--fs-regular);
 	color: var(--color-text-tertiary);
 	text-align: start;
+	white-space: normal;
+	line-height: 1.4;
 }
 
 /* ---------------ANNOTATED PAGES LIST--------------- */

@@ -1,3 +1,8 @@
+// wrap so a second inject (popup ensureWebpageScript) does not redeclare lets or stack listeners
+(() => {
+	if (globalThis.__notateHasLoaded) return
+	globalThis.__notateHasLoaded = true
+
 // ERIC'S DEMO______________________________________________________________________________________
 // function renderReadingTime(article) {
 //   // If we weren't provided an article, we don't need to render anything.
@@ -59,6 +64,8 @@ let storageKey = 'notate-annotations'
 // keep one shared saved object in chrome storage so popup and content script can both read it
 // chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage, async: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function, await from Eric demo, logical OR operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR
 const getStoredAnnotations = async () => {
+	if (!chrome?.storage?.local) return {}
+
 	const stored = await chrome.storage.local.get(storageKey)
 	return stored[storageKey] || {}
 }
@@ -697,6 +704,8 @@ const enterAnnotationMode = async (scroll = false, selector = null) => {
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
 // async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
 const initAnnotations = async () => {
+	if (!chrome?.storage?.local) return
+
 	await loadAnnotations()
 
 	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector'])
@@ -771,7 +780,12 @@ window.addEventListener('resize', repositionAnnotations)
 // listen for popup messages like start annotating or clear this page
 // runs a selector through for already-open tabs so they scroll to the right annotation
 // chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+	if (message.action === 'notate-ping') {
+		sendResponse({ ok: true })
+		return
+	}
+
 	const runtimeActions = {
 		'enter-annotation-mode': () => enterAnnotationMode(false),
 		'enter-annotation-mode-scroll': () => enterAnnotationMode(true, message.selector || null),
@@ -784,3 +798,4 @@ chrome.runtime.onMessage.addListener((message) => {
 
 	action()
 })
+})()
