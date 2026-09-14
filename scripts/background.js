@@ -1,6 +1,4 @@
-// had to add this back in because chrome won't let the popup switch tabs/windows while it's still open
-// tried doing it directly in popup.js but the focus call didn't do anything
-// the background script runs outside the popup so it can actually take over after the popup closes
+importScripts('url-match.js')
 
 const pingTab = async (tabId) => {
 	await chrome.tabs.sendMessage(tabId, { action: 'notate-ping' })
@@ -9,7 +7,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -31,37 +29,85 @@ const ensureWebpageScript = async (tabId) => {
 	}
 }
 
+const PENDING_MAX_AGE_MS = 15000
+
+const isFreshPending = (stored = {}) => {
+	const startedAt = stored['notate-pending-at'] || 0
+	return Date.now() - startedAt < PENDING_MAX_AGE_MS
+}
+
+const clearPending = async () => {
+	await chrome.storage.local.remove([
+		'notate-pending-url',
+		'notate-pending-selector',
+		'notate-pending-at'
+	])
+}
+
+const enterOnTab = async (tabId, selector) => {
+	const ready = await ensureWebpageScript(tabId)
+	if (!ready) return false
+
+	await chrome.tabs.sendMessage(tabId, {
+		action: 'enter-annotation-mode-scroll',
+		selector: selector || null
+	})
+	return true
+}
+
+const tryEnterPendingOnTab = async (tab) => {
+	if (!tab?.id || !tab.url) return
+
+	const stored = await chrome.storage.local.get([
+		'notate-pending-url',
+		'notate-pending-selector',
+		'notate-pending-at'
+	])
+	const pendingUrl = stored['notate-pending-url']
+
+	if (!pendingUrl || !isFreshPending(stored) || !pageUrlsMatch(pendingUrl, tab.url)) return
+
+	try {
+		const ok = await enterOnTab(tab.id, stored['notate-pending-selector'] || null)
+		if (ok) await clearPending()
+	} catch {
+		// leave pending so a later complete event can retry
+	}
+}
+
 // chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	if (message.action !== 'activate-tab') return
 
-	const { tabId, windowId } = message
+	const { tabId, windowId, selector } = message
 
-	// focus the right window, make the tab active, tell it to enter annotation mode
-	// also gets the selector from storage and passes it along so it can scroll to a specific annotation
-	// chrome.windows.update: https://developer.chrome.com/docs/extensions/reference/api/windows
-	// chrome.tabs.update: https://developer.chrome.com/docs/extensions/reference/api/tabs#method-update
-	// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs#method-sendMessage
 	const activateTab = async () => {
 		const stored = await chrome.storage.local.get('notate-pending-selector')
-		const selector = stored['notate-pending-selector'] || null
+		const nextSelector = selector || stored['notate-pending-selector'] || null
 
-		await chrome.windows.update(windowId, { focused: true })
-		await chrome.tabs.update(tabId, { active: true })
-		await ensureWebpageScript(tabId)
-
-		try {
-			await chrome.tabs.sendMessage(tabId, {
-				action: 'enter-annotation-mode-scroll',
-				selector
-			})
-		} catch {
-			// content script still missing (chrome:// page, or files not on disk yet)
+		if (windowId) {
+			try {
+				await chrome.windows.update(windowId, { focused: true })
+			} catch {
+				// popup may already have closed; focusing is best-effort
+			}
 		}
 
-		await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector'])
+		await chrome.tabs.update(tabId, { active: true })
+
+		try {
+			const ok = await enterOnTab(tabId, nextSelector)
+			if (ok) await clearPending()
+		} catch {
+			// content script still missing; tabs.onUpdated can retry
+		}
 	}
 
 	activateTab().finally(() => sendResponse({ ok: true }))
 	return true
+})
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+	if (changeInfo.status !== 'complete') return
+	tryEnterPendingOnTab(tab)
 })

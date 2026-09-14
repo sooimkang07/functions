@@ -14,11 +14,27 @@ const isRestrictedTab = (tab) => {
 }
 
 const renderStatusMessage = (text) => {
+	const banner = document.querySelector('#popup-banner')
+	if (banner) {
+		banner.hidden = false
+		banner.textContent = text
+		return
+	}
+
 	if (!list) return
 
 	list.innerHTML = `
 		<li class="popup-empty-state">${text}</li>
 	`
+}
+
+const escapeHtml = (value = '') => {
+	return String(value)
+		.replace(/&/g, '&amp;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
 }
 
 const pingTab = async (tabId) => {
@@ -28,7 +44,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -134,7 +150,7 @@ const createPageItem = (page) => {
 	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=16`
 	const annotationItems = [...page.annotations].reverse().map((a) => `
 		<li>
-			<button class="popup-annotation-item" type="button" data-url="${page.url}" data-selector="${a.selector}">${a.text}</button>
+			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(a.selector)}">${escapeHtml(a.text)}</button>
 		</li>
 	`).join('')
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join
@@ -142,9 +158,9 @@ const createPageItem = (page) => {
 	return `
 		<li class="popup-page-item">
 			<div class="popup-page-row">
-				<button class="popup-page-button" type="button" data-url="${page.url}">
+				<button class="popup-page-button" type="button" data-url="${escapeHtml(page.url)}">
 					<img class="popup-page-favicon" src="${favicon}" alt="" width="8" height="8">
-					<span class="popup-page-title">${page.title || page.url}</span>
+					<span class="popup-page-title">${escapeHtml(page.title || page.url)}</span>
 				</button>
 				<button class="popup-page-toggle" type="button" aria-label="Toggle annotations">
 					<span class="popup-page-count">(${count})</span>
@@ -171,38 +187,65 @@ const renderEmptyState = () => {
 const findMatchingTab = async (url) => {
 	const tabs = await chrome.tabs.query({})
 
-	return tabs.find((tab) => tab.url === url)
+	return tabs.find((tab) => pageUrlsMatch(tab.url, url))
 }
 
 // write the url I want to annotate into storage so webpage.js can read it after the page loads
 // popup closes before a new tab finishes loading, so need chrome local storage to hold/send the url to webpage.js
 // chrome.storage.local.set: https://developer.chrome.com/docs/extensions/reference/api/storage
 const setPendingAnnotationUrl = async (url) => {
-	await getExtensionStorage()?.set({ 'notate-pending-url': url })
+	await getExtensionStorage()?.set({
+		'notate-pending-url': url,
+		'notate-pending-at': Date.now()
+	})
 }
 
-// if the page is already open somewhere, tell background.js to switch to it
-// tried doing the window/tab focus directly but couldn't because chrome blocks it while the popup is still open
-// if it's not open, just create a new tab and let the pending url in storage handle the rest
+// if the page is already open somewhere, switch to it and tell webpage.js to enter annotation mode
+// await the background message before closing the popup or Chrome drops it
+// if it's not open, create a new tab and let pending storage / tabs.onUpdated finish the rest
 // selector gets saved to storage so webpage.js can scroll to that specific annotation
-// chrome.runtime.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
-// chrome.tabs.create: https://developer.chrome.com/docs/extensions/reference/api/tabs
 const activateOrOpenPage = async (url, selector = null) => {
-	const matchingTab = await findMatchingTab(url)
+	if (!url) return
+
+	const storage = getExtensionStorage()
 
 	if (selector) {
-		await getExtensionStorage()?.set({ 'notate-pending-selector': selector })
+		await storage?.set({ 'notate-pending-selector': selector })
+	} else {
+		await storage?.remove('notate-pending-selector')
 	}
 
+	await setPendingAnnotationUrl(url)
+
+	const matchingTab = await findMatchingTab(url)
+
 	if (matchingTab?.id) {
-		await setPendingAnnotationUrl(url)
-		chrome.runtime.sendMessage({ 
-			action: 'activate-tab', 
-			tabId: matchingTab.id, 
-			windowId: matchingTab.windowId 
-		})
+		try {
+			await chrome.tabs.update(matchingTab.id, { active: true })
+		} catch {
+			// background script can still focus the window after the popup closes
+		}
+
+		try {
+			await chrome.runtime.sendMessage({
+				action: 'activate-tab',
+				tabId: matchingTab.id,
+				windowId: matchingTab.windowId,
+				selector,
+				url
+			})
+		} catch {
+			await ensureWebpageScript(matchingTab.id)
+			try {
+				await chrome.tabs.sendMessage(matchingTab.id, {
+					action: 'enter-annotation-mode-scroll',
+					selector
+				})
+			} catch {
+				// new page load / tabs.onUpdated will pick up pending storage
+			}
+		}
 	} else {
-		await setPendingAnnotationUrl(url)
 		await chrome.tabs.create({ url })
 	}
 
@@ -257,7 +300,7 @@ const onStartAnnotatingClick = async () => {
 	const result = await sendActionToActiveTab('enter-annotation-mode')
 
 	if (result?.reason === 'restricted') {
-		renderStatusMessage('Open a regular webpage first. Chrome pages like chrome://extensions cannot be annotated.')
+		renderStatusMessage('Open a regular website first. Chrome’s new tab page and chrome:// pages cannot be annotated. Click a Notated page below, then use the pencil.')
 		return
 	}
 

@@ -73,8 +73,8 @@ const getStoredAnnotations = async () => {
 // use the current page url as the key for that page's annotation group
 // Location.href: https://developer.mozilla.org/en-US/docs/Web/API/Location/href
 // keeps each page's saved notes separated by its own url
-const getPageKey = () => {
-	return location.href
+const getPageKey = (storedAnnotations = {}, url = location.href) => {
+	return findStoredPageKey(storedAnnotations, url)
 }
 
 // save this page back into the extension storage
@@ -83,8 +83,9 @@ const getPageKey = () => {
 const saveAnnotations = async () => {
 	// instead of saving one array per page in localStorage, save this page inside the shared extension storage
 	const storedAnnotations = await getStoredAnnotations()
+	const pageKey = getPageKey(storedAnnotations)
 
-	storedAnnotations[getPageKey()] = {
+	storedAnnotations[pageKey] = {
 		title: document.title,
 		url: location.href,
 		annotations,
@@ -100,7 +101,7 @@ const saveAnnotations = async () => {
 // chrome.storage.local.get returns the shared annotation object, then this page pulls only its own annotations back out
 const loadAnnotations = async () => {
 	const storedAnnotations = await getStoredAnnotations()
-	const pageData = storedAnnotations[getPageKey()]
+	const pageData = findStoredPage(storedAnnotations, location.href)
 
 	annotations = pageData?.annotations || []
 }
@@ -109,7 +110,7 @@ const loadAnnotations = async () => {
 // delete operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
 const removeStoredPage = async () => {
 	const storedAnnotations = await getStoredAnnotations()
-	delete storedAnnotations[getPageKey()]
+	delete storedAnnotations[getPageKey(storedAnnotations)]
 
 	await chrome.storage.local.set({
 		[storageKey]: storedAnnotations
@@ -691,11 +692,19 @@ const enterAnnotationMode = async (scroll = false, selector = null) => {
 		if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 	}
 
+	const runScroll = () => requestAnimationFrame(scrollTarget)
+
 	if (document.visibilityState === 'visible') {
-		requestAnimationFrame(scrollTarget)
-	} else {
-		document.addEventListener('visibilitychange', scrollTarget, { once: true })
+		runScroll()
+		setTimeout(runScroll, 250)
+		return
 	}
+
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState !== 'visible') return
+		runScroll()
+		setTimeout(runScroll, 250)
+	}, { once: true })
 }
 
 // when page loads, pull this page's annotations from shared extension storage
@@ -708,12 +717,13 @@ const initAnnotations = async () => {
 
 	await loadAnnotations()
 
-	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector'])
+	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
 	const pendingUrl = stored['notate-pending-url']
+	const pendingAge = Date.now() - (stored['notate-pending-at'] || 0)
 
-	if (pendingUrl !== location.href) return
+	if (!pendingUrl || pendingAge > 15000 || !pageUrlsMatch(pendingUrl, location.href)) return
 
-	await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector'])
+	await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
 
 	const pendingSelector = stored['notate-pending-selector'] || null
 	enterAnnotationMode(true, pendingSelector)

@@ -11,8 +11,9 @@ Use a copy that stays on this Mac:
 1. Open Terminal in this project folder and run:
    `chmod +x copy-to-local.sh && ./copy-to-local.sh`
 2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
-3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`.
-4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar, on a normal http/https webpage.
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.1**.
+4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar.
+5. The pencil only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be annotated. Click a saved page in the popup first, then use the pencil.
 
 If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.
 
