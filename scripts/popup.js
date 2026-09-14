@@ -3,10 +3,62 @@ let storageKey = 'notate-annotations'
 let list = document.querySelector('#annotation-pages')
 let annotateButton = document.querySelector('[data-action="start-annotating"]')
 
+// chrome.storage only exists when this file runs as the unpacked extension popup.
+// opening index.html as a normal page (Live Server, Finder, file://) makes chrome.storage undefined
+// and throws: Cannot read properties of undefined (reading 'local')
+const getExtensionStorage = () => chrome?.storage?.local ?? null
+
+const isRestrictedTab = (tab) => {
+	const url = tab?.url || ''
+	return !/^https?:/.test(url)
+}
+
+const renderStatusMessage = (text) => {
+	if (!list) return
+
+	list.innerHTML = `
+		<li class="popup-empty-state">${text}</li>
+	`
+}
+
+const pingTab = async (tabId) => {
+	await chrome.tabs.sendMessage(tabId, { action: 'notate-ping' })
+}
+
+const injectWebpageScript = async (tabId) => {
+	await chrome.scripting.executeScript({
+		target: { tabId },
+		files: ['scripts/webpage.js']
+	})
+	await chrome.scripting.insertCSS({
+		target: { tabId },
+		files: ['styles/webpage.css']
+	})
+}
+
+// content scripts do not attach to tabs that were already open before Load unpacked / Reload
+// ping first so we do not inject webpage.js twice
+const ensureWebpageScript = async (tabId) => {
+	try {
+		await pingTab(tabId)
+		return 'ready'
+	} catch {
+		try {
+			await injectWebpageScript(tabId)
+			return 'injected'
+		} catch {
+			return 'missing'
+		}
+	}
+}
+
 // get the shared saved annotations object the popup and webpage script both read from 
 // chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage
 const getStoredAnnotations = async () => {
-	const stored = await chrome.storage.local.get(storageKey)
+	const storage = getExtensionStorage()
+	if (!storage) return {}
+
+	const stored = await storage.get(storageKey)
 	return stored[storageKey] || {}
 }
 
@@ -25,18 +77,32 @@ const getActiveTab = async () => {
 // had to rabbit hole this because the popup wouldn't always work when i first loaded/clicked on it, so i first googled: https://www.google.com/search?q=chrome+extension+popup+click+does+nothing+first+time&rlz=1C5CHFA_enUS976US983&oq=chrome+extension+popup+click+does+nothing+first+time&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRigATIHCAYQIRirAtIBBzI3MWowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 then followed down 4th option of background script issue not listening quick enough, then googled: https://www.google.com/search?q=chrome+extension+content+script+not+ready+first+message&rlz=1C5CHFA_enUS976US983&oq=chrome+extension+content+script+not+ready+first+message&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRifBdIBBzIyNWowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 then followed "recommended implementation pattern" section and clicked on this link: https://groups.google.com/a/chromium.org/g/chromium-extensions/c/st_Nh7j3908. also looked up my console error and found this: https://romanisthere.github.io/posts/receiving-end/. then googled this from those forum references: https://www.google.com/search?q=chrome.tabs.sendMessage+try+catch+error+handling&rlz=1C5CHFA_enUS976US983&oq=chrome.tabs.sendMessage+try+catch+error+handling&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIHCAEQIRigATIHCAIQIRigATIHCAMQIRigATIHCAQQIRigATIHCAUQIRiPAtIBBzEzNmowajeoAgCwAgA&sourceid=chrome&ie=UTF-8 and followed "promise-based handling" first option for try/catch function. then found this google group forum to help with the storage fallback: https://groups.google.com/a/chromium.org/g/chromium-extensions/c/BH5_4OKxM3s 
 const sendActionToActiveTab = async (action) => {
 	const tab = await getActiveTab()
-	if (!tab?.id) return
+	if (!tab?.id) return { ok: false, reason: 'no-tab' }
+
+	if (isRestrictedTab(tab)) {
+		return { ok: false, reason: 'restricted' }
+	}
 
 	await setPendingAnnotationUrl(tab.url)
+
+	const scriptState = await ensureWebpageScript(tab.id)
+
+	if (scriptState === 'missing') {
+		// last resort: reload so the content script can install on a normal page load
+		await chrome.tabs.reload(tab.id)
+		return { ok: true, reason: 'reloaded' }
+	}
 
 	try {
 		// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
 		await chrome.tabs.sendMessage(tab.id, { action })
 		// Only remove if message was received
-		await chrome.storage.local.remove('notate-pending-url')
+		await getExtensionStorage()?.remove('notate-pending-url')
+		return { ok: true }
 	} catch {
 		// Content script not ready yet so leave pending URL in storage
 		// webpage.js will pick it up with initAnnotations() once it loads
+		return { ok: true, reason: 'pending' }
 	}
 }
 
@@ -112,7 +178,7 @@ const findMatchingTab = async (url) => {
 // popup closes before a new tab finishes loading, so need chrome local storage to hold/send the url to webpage.js
 // chrome.storage.local.set: https://developer.chrome.com/docs/extensions/reference/api/storage
 const setPendingAnnotationUrl = async (url) => {
-	await chrome.storage.local.set({ 'notate-pending-url': url })
+	await getExtensionStorage()?.set({ 'notate-pending-url': url })
 }
 
 // if the page is already open somewhere, tell background.js to switch to it
@@ -125,7 +191,7 @@ const activateOrOpenPage = async (url, selector = null) => {
 	const matchingTab = await findMatchingTab(url)
 
 	if (selector) {
-		await chrome.storage.local.set({ 'notate-pending-selector': selector })
+		await getExtensionStorage()?.set({ 'notate-pending-selector': selector })
 	}
 
 	if (matchingTab?.id) {
@@ -188,19 +254,35 @@ const renderAnnotatedPages = async () => {
 // popup starts annotation mode on the current tab, then closes
 // Window.close: https://developer.mozilla.org/en-US/docs/Web/API/Window/close
 const onStartAnnotatingClick = async () => {
-	await sendActionToActiveTab('enter-annotation-mode')
+	const result = await sendActionToActiveTab('enter-annotation-mode')
+
+	if (result?.reason === 'restricted') {
+		renderStatusMessage('Open a regular webpage first. Chrome pages like chrome://extensions cannot be annotated.')
+		return
+	}
+
+	if (result?.ok === false) {
+		renderStatusMessage('Notate could not reach this tab. Try a regular http/https page, then click the pencil again.')
+		return
+	}
+
 	window.close()
 }
 
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
-	await chrome.storage.local.remove(storageKey)
+	await getExtensionStorage()?.remove(storageKey)
 	renderAnnotatedPages()
 }
 
 // initial popup load
 const initPopup = () => {
+	if (!getExtensionStorage()) {
+		renderStatusMessage('Notate has to run as a loaded Chrome extension, not as a webpage. Load unpacked from a local folder (not iCloud), then use the toolbar icon.')
+		return
+	}
+
 	annotateButton.addEventListener('click', onStartAnnotatingClick)
 
 	const clearAllButton = document.querySelector('[data-action="clear-all"]')

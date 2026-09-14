@@ -6,10 +6,13 @@
 	"permissions": [
 		"activeTab",
 		"tabs",
-		// need to give windows permission AND tabs from the popup 
-		// https://developer.chrome.com/docs/extensions/reference/api/windows
 		"windows",
-		"storage"
+		"storage",
+		"scripting"
+	],
+	"host_permissions": [
+		"http://*/*",
+		"https://*/*"
 	],
 	"background": {
 		"service_worker": "scripts/background.js"
@@ -21,7 +24,8 @@
 	"content_scripts": [
 		{
 			"matches": [
-				"<all_urls>"
+				"http://*/*",
+				"https://*/*"
 			],
 			"js": [
 				"scripts/webpage.js"
