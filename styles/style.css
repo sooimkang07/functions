@@ -537,11 +537,11 @@ header {
 }
 
 #group-edit-dialog {
-	inset: 0;
 	margin: auto;
 	inline-size: min(18rem, calc(100% - var(--space-xl)));
 	max-inline-size: calc(100% - var(--space-lg));
 	max-block-size: calc(100% - var(--space-lg));
+	block-size: fit-content;
 	padding: var(--space-sm);
 	border: var(--border-ui);
 	border-radius: var(--radius-md);
