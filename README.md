@@ -11,10 +11,10 @@ Use a copy that stays on this Mac:
 1. Open Terminal in this project folder and run:
    `chmod +x copy-to-local.sh && ./copy-to-local.sh`
 2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
-3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.2**.
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.3**.
 4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **side panel** that stays open while you scroll and switch pages.
 5. The pencil only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be annotated. Click a saved page in the side panel first, then use the pencil.
-6. Clicking a saved page or note opens **preview** (notes visible, no create-on-click). Click **Edit** on the page toolbar, or the pencil, to add and drag notes.
+6. Clicking a saved page or note opens **preview** (notes visible, no create-on-click). Click **Edit** to write notes, or **Move** to drag them without opening the editor. ⌘↩ saves. Export is in the side panel.
 7. If the toolbar/popup N icon is missing, the PNGs in `images/` are still iCloud cloud-only files. Right-click `images` → **Download Now** / **Keep Downloaded**, or load from `~/notate-extension`. Click **Clear all** on the Errors page — Chrome keeps old errors after Reload.
 
 If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.

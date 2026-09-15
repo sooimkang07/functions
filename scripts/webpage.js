@@ -55,7 +55,9 @@ let toolbar
 
 let isAnnotating = false
 let isPreviewing = false
+let isMoving = false
 let noteDrag = null
+let noteDidDrag = false
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
 // save all current annotations in the browser so they still exist when visiting site later
@@ -103,7 +105,7 @@ const loadAnnotations = async () => {
 	const storedAnnotations = await getStoredAnnotations()
 	const pageData = findStoredPage(storedAnnotations, location.href)
 
-	annotations = pageData?.annotations || []
+	annotations = (pageData?.annotations || []).map(notateNormalizeAnnotation)
 }
 
 // remove this page's saved record completely when it no longer has any annotations
@@ -183,6 +185,37 @@ const confirmClear = () => {
 	return window.confirm('Clear all notations? This cannot be undone.')
 }
 
+const fillGroupOptions = () => {
+	const list = modal?.querySelector('#notate-groups')
+	if (!list) return
+
+	list.innerHTML = notateUniqueGroups(annotations).map((group) => {
+		return `<option value="${notateEscapeHtml(group)}"></option>`
+	}).join('')
+}
+
+const syncModalFields = (annotation) => {
+	fillGroupOptions()
+
+	const color = notateNormalizeColor(annotation?.color)
+	modal.dataset.color = color
+
+	form.querySelectorAll('[name="annotation-color"]').forEach((input) => {
+		input.checked = input.value === color
+	})
+
+	const groupInput = form.querySelector('[name="annotation-group"]')
+	if (groupInput) groupInput.value = annotation?.group || ''
+}
+
+const readModalMeta = () => {
+	return {
+		text: textarea.value.trim(),
+		color: notateNormalizeColor(form.querySelector('[name="annotation-color"]:checked')?.value),
+		group: notateNormalizeGroup(form.querySelector('[name="annotation-group"]')?.value)
+	}
+}
+
 // open modal to create a new annotation
 // HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
 // stores the clicked target in activeTarget, clears edit mode, opens modal
@@ -193,6 +226,7 @@ const openCreateModal = (target) => {
 	editingAnnotationId = null
 	textarea.value = ''
 	scaleNoteType('', textarea)
+	syncModalFields()
 	modal.showModal()
 	placeModalNear(target)
 }
@@ -207,6 +241,7 @@ const openEditModal = (annotation) => {
 	activeTarget = document.querySelector(annotation.selector)
 	textarea.value = annotation.text
 	scaleNoteType(annotation.text, textarea)
+	syncModalFields(annotation)
 	modal.showModal()
 	placeModalNear(activeTarget)
 }
@@ -225,6 +260,11 @@ const createToolbar = () => {
 			<li>
 				<button class="notate-toolbar-button" type="button" data-action="edit">
 					Edit
+				</button>
+			</li>
+			<li>
+				<button class="notate-toolbar-button" type="button" data-action="move">
+					Move
 				</button>
 			</li>
 			<li>
@@ -276,12 +316,25 @@ const createModal = () => {
 	modal.innerHTML = `
 		<form method="dialog">
 			<textarea id="annotation-text" name="annotation-text"></textarea>
+			<label>
+				Group
+				<input name="annotation-group" list="notate-groups" autocomplete="off">
+			</label>
+			<datalist id="notate-groups"></datalist>
+			<fieldset>
+				<legend>Color</legend>
+				${NOTATE_COLORS.map((color) => `
+					<label data-color="${color}">
+						<input type="radio" name="annotation-color" value="${color}">
+					</label>
+				`).join('')}
+			</fieldset>
 			<menu>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
-					<button type="submit" name="intent" value="save">Save</button>
+					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save <kbd>⌘↩</kbd></button>
 				</li>
 			</menu>
 		</form>
@@ -296,6 +349,10 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 	textarea.addEventListener('input', () => {
 		scaleNoteType(textarea.value, textarea)
+	})
+	modal.addEventListener('change', (event) => {
+		if (event.target.name !== 'annotation-color') return
+		modal.dataset.color = event.target.value
 	})
 }
 
@@ -465,11 +522,12 @@ const renderAnnotation = (annotation) => {
 	const note = document.createElement('aside')
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
+	note.dataset.color = notateNormalizeColor(annotation.color)
 
 	// "x" corner button to delete the annotation, inserting through html
 	note.innerHTML = `
 		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
-		<p>${annotation.text}</p>
+		<p>${notateEscapeHtml(annotation.text)}</p>
 	`
 
 	note.style.insetBlockStart = `${position.top}px`
@@ -499,14 +557,16 @@ const renderAllAnnotations = () => {
 // saving a new note to create the object, store it, and show it right away
 // Array.push: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push
 // builds a new annotation from activeTarget and text, inserts into annotations, saves it, renders it
-const createAnnotation = async (text) => {
-	const annotation = {
+const createAnnotation = async (text, color, group) => {
+	const annotation = notateNormalizeAnnotation({
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
 		text,
+		color,
+		group,
 		offsetInline: 0,
 		offsetBlock: 0
-	}
+	})
 
 	annotations.push(annotation)
 
@@ -517,15 +577,19 @@ const createAnnotation = async (text) => {
 // editing a note updates both the saved data and the visible note text
 // Node.textContent: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
 // updates the matching annotation object, saves annotations, updates the <p> inside .notate-note[data-id="${id}"]
-const updateAnnotation = async (id, text) => {
+const updateAnnotation = async (id, text, color, group) => {
 	const annotation = getAnnotationById(id)
+	if (!annotation) return
 	annotation.text = text
+	annotation.color = notateNormalizeColor(color)
+	annotation.group = notateNormalizeGroup(group)
 
 	await saveAnnotations()
 
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
 	if (!note) return
 
+	note.dataset.color = annotation.color
 	const noteText = note.querySelector('p')
 	noteText.textContent = text
 	scaleNoteType(text, note)
@@ -575,8 +639,9 @@ const clearAnnotations = async () => {
 // sets isAnnotating = true, adds 'is-annotating' on document.documentElement, creates toolbar, renders notes
 const startAnnotating = () => {
 	isPreviewing = false
+	isMoving = false
 	isAnnotating = true
-	document.documentElement.classList.remove('is-previewing')
+	document.documentElement.classList.remove('is-previewing', 'is-moving')
 	document.documentElement.classList.add('is-annotating')
 	createToolbar()
 	renderAllAnnotations()
@@ -584,9 +649,21 @@ const startAnnotating = () => {
 
 const startPreviewing = () => {
 	isAnnotating = false
+	isMoving = false
 	isPreviewing = true
-	document.documentElement.classList.remove('is-annotating')
+	document.documentElement.classList.remove('is-annotating', 'is-moving')
 	document.documentElement.classList.add('is-previewing')
+	clearHoverFill()
+	createToolbar()
+	renderAllAnnotations()
+}
+
+const startMoving = () => {
+	isPreviewing = false
+	isAnnotating = false
+	isMoving = true
+	document.documentElement.classList.remove('is-previewing', 'is-annotating')
+	document.documentElement.classList.add('is-moving')
 	clearHoverFill()
 	createToolbar()
 	renderAllAnnotations()
@@ -597,7 +674,8 @@ const startPreviewing = () => {
 const stopAnnotating = () => {
 	isAnnotating = false
 	isPreviewing = false
-	document.documentElement.classList.remove('is-annotating', 'is-previewing')
+	isMoving = false
+	document.documentElement.classList.remove('is-annotating', 'is-previewing', 'is-moving')
 	removeToolbar()
 	hideLayer()	
 	if (modal?.open) {
@@ -616,17 +694,8 @@ const toggleAnnotating = () => {
 
 // Event.preventDefault: https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault, SubmitEvent.submitter: https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter
 // consolidate to one function so it reads event.submitter.value and textarea.value.trim() to either cancel, ignore blank text, update an existing note, or create a new one
-const onModalSubmit = async (event) => {
-	event.preventDefault()
-
-	const formData = new FormData(form)
-	const submitValue = event.submitter?.value || formData.get('intent') || 'save'
-	const text = textarea.value.trim()
-
-	if (submitValue === 'cancel') {
-		closeModal()
-		return
-	}
+const saveFromModal = async () => {
+	const { text, color, group } = readModalMeta()
 
 	if (!text) {
 		closeModal()
@@ -634,13 +703,27 @@ const onModalSubmit = async (event) => {
 	}
 
 	if (editingAnnotationId) {
-		await updateAnnotation(editingAnnotationId, text)
+		await updateAnnotation(editingAnnotationId, text, color, group)
 		closeModal()
 		return
 	}
 
-	await createAnnotation(text)
+	await createAnnotation(text, color, group)
 	closeModal()
+}
+
+const onModalSubmit = async (event) => {
+	event.preventDefault()
+
+	const formData = new FormData(form)
+	const submitValue = event.submitter?.value || formData.get('intent') || 'save'
+
+	if (submitValue === 'cancel') {
+		closeModal()
+		return
+	}
+
+	await saveFromModal()
 }
 
 // click the x button inside a note to delete only that note
@@ -680,7 +763,10 @@ const onPageClick = (event) => {
 // ignores the delete button, finds the clicked .notate-note, gets its id from note.dataset.id, opens that annotation in edit mode
 const onNoteClick = (event) => {
 	if (event.target.closest('.notate-delete')) return
-	if (noteDrag?.moved) return
+	if (isMoving || noteDidDrag || noteDrag?.moved) {
+		noteDidDrag = false
+		return
+	}
 
 	const note = event.target.closest('.notate-note')
 	if (!note) return
@@ -704,6 +790,7 @@ const onToolbarClick = async (event) => {
 	const action = button?.dataset.action
 	const toolbarActions = {
 		edit: startAnnotating,
+		move: startMoving,
 		clear: clearAnnotations,
 		exit: stopAnnotating
 	}
@@ -719,7 +806,13 @@ const onToolbarClick = async (event) => {
 // Escape key exits annotation mode
 // KeyboardEvent.key: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key
 const onKeydown = (event) => {
-	if (event.key !== 'Escape' || (!isAnnotating && !isPreviewing)) return
+	if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && modal?.open) {
+		event.preventDefault()
+		saveFromModal()
+		return
+	}
+
+	if (event.key !== 'Escape' || (!isAnnotating && !isPreviewing && !isMoving)) return
 	if (modal?.open) return
 
 	stopAnnotating()
@@ -748,7 +841,7 @@ const repositionNote = (note) => {
 // NodeList.forEach: https://developer.mozilla.org/en-US/docs/Web/API/NodeList/forEach
 // only runs while annotating so this isn't doing extra work all the time
 const repositionAnnotations = () => {
-	if ((!isAnnotating && !isPreviewing) || !layer) return
+	if ((!isAnnotating && !isPreviewing && !isMoving) || !layer) return
 
 	layer.querySelectorAll('.notate-note').forEach((note) => {
 		repositionNote(note)
@@ -851,7 +944,7 @@ document.addEventListener('click', onNoteClick, true)
 document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
 document.addEventListener('pointerdown', (event) => {
-	if (!isAnnotating || event.button !== 0) return
+	if (!isMoving || event.button !== 0) return
 	if (event.target.closest('.notate-delete')) return
 
 	const note = event.target.closest('.notate-note')
@@ -860,6 +953,7 @@ document.addEventListener('pointerdown', (event) => {
 	const annotation = getAnnotationById(note.dataset.id)
 	if (!annotation) return
 
+	noteDidDrag = false
 	noteDrag = {
 		id: annotation.id,
 		startX: event.clientX,
@@ -872,11 +966,14 @@ document.addEventListener('pointerdown', (event) => {
 }, true)
 
 document.addEventListener('pointermove', (event) => {
-	if (!noteDrag) return
+	if (!noteDrag || !isMoving) return
 
 	const deltaX = event.clientX - noteDrag.startX
 	const deltaY = event.clientY - noteDrag.startY
-	if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) noteDrag.moved = true
+	if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+		noteDrag.moved = true
+		noteDidDrag = true
+	}
 
 	const annotation = getAnnotationById(noteDrag.id)
 	if (!annotation) return

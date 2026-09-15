@@ -13,7 +13,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
