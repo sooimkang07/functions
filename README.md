@@ -1,7 +1,23 @@
 OVERVIEW
-Notate is a Chrome extension that allows live “notating” directly on any webpage. Instead of separating notes from their source, notations are anchored directly to the user-selected DOM, allowing users to capture thoughts exactly where they occur. All saved notations are saved down the entire page as the user freely scrolls as well as within the popup itself, allowing users to jump to their notated pages and their individual notations in each one. 
+Notate is a Chrome extension that lets users annotate specific elements directly on live webpages, preserving what caught their attention, why it mattered, and the original context so they can easily return to it later. Notes stay attached to the element as the page scrolls. The toolbar popup is a quiet library of marked pages — click a page or a note to jump back. 
 
 This is V1 of Notate, limited by time and my current skillset. But, I aim to expand this into a more highly functional and customizable extension to eventually be put up in the extension store for users to freely use across any and all websites. 
+
+HOW TO LOAD (IMPORTANT)
+Do not Load unpacked from iCloud Drive, Desktop, or Documents if those folders are iCloud-synced. Chrome reads every extension file from disk. Cloud-only placeholders (the little cloud icons in Finder) make `chrome.storage` fail, keep content scripts from injecting, and force you to wait on iCloud every time you open the project.
+
+Use a copy that stays on this Mac:
+
+1. Open Terminal in this project folder and run:
+   `chmod +x copy-to-local.sh && ./copy-to-local.sh`
+2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.16**.
+4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **popup** under the icon, like other extensions.
+5. **New** only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be marked. Open a website first, or click a saved page in the popup.
+6. How it works: **New** → click the element that caught your eye → write why it mattered → open **Group** and pick an existing name, or **+ New Group** to name it and pick a color → Save (⌘↩). If a group tab is selected, New starts in that group. The library opens on **All** (newest notes first). Scroll the tabs at the top to filter by group, or drag a named group tab to reorder it. Right-click a named group tab to rename it, change its color, or delete it (notes stay in All). **Done** finishes adding, or puts Notate away. Drag a note to move it while adding.
+7. If the toolbar/popup N icon is missing, the PNGs in `images/` are still iCloud cloud-only files. Right-click `images` → **Download Now** / **Keep Downloaded**, or load from `~/notate-extension`. Click **Clear all** on the Errors page — Chrome keeps old errors after Reload.
+
+If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.
 
 GOALS OF THE PROJECT
 * Identify an “actual” problem either in my own life or others and answer this using what we’ve learned in class so far (HTML, CSS, vanilla JS)

@@ -1,29 +1,42 @@
 {
 	"manifest_version": 3,
 	"name": "Notate",
-	"description": "Annotate webpage elements with notes",
-	"version": "1.0",
+	"description": "Annotate specific elements on live pages. Keep what caught your attention, why it mattered, and the original context so you can return later.",
+	"version": "1.16",
 	"permissions": [
 		"activeTab",
 		"tabs",
-		// need to give windows permission AND tabs from the popup 
-		// https://developer.chrome.com/docs/extensions/reference/api/windows
 		"windows",
-		"storage"
+		"storage",
+		"scripting"
+	],
+	"host_permissions": [
+		"http://*/*",
+		"https://*/*"
 	],
 	"background": {
 		"service_worker": "scripts/background.js"
 	},
 	"action": {
 		"default_title": "Notate",
-		"default_popup": "index.html"
+		"default_popup": "index.html",
+		"default_icon": {
+			"16": "images/icon-16.png",
+			"32": "images/icon-32.png",
+			"48": "images/icon-48.png",
+			"128": "images/icon-128.png"
+		}
 	},
 	"content_scripts": [
 		{
 			"matches": [
-				"<all_urls>"
+				"http://*/*",
+				"https://*/*"
 			],
 			"js": [
+				"scripts/url-match.js",
+				"scripts/safe-storage.js",
+				"scripts/note-meta.js",
 				"scripts/webpage.js"
 			],
 			"css": [

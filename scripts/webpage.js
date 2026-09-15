@@ -1,3 +1,8 @@
+// wrap so a second inject (popup ensureWebpageScript) does not redeclare lets or stack listeners
+(() => {
+	if (globalThis.__notateHasLoaded) return
+	globalThis.__notateHasLoaded = true
+
 // ERIC'S DEMO______________________________________________________________________________________
 // function renderReadingTime(article) {
 //   // If we weren't provided an article, we don't need to render anything.
@@ -49,6 +54,15 @@ let layer
 let toolbar
 
 let isAnnotating = false
+let isPreviewing = false
+let isMoving = false
+let noteDrag = null
+let noteDidDrag = false
+let pendingInteraction = null
+let pendingGroup = ''
+let lastPointerTarget = null
+let lastPointerX = 0
+let lastPointerY = 0
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
 // save all current annotations in the browser so they still exist when visiting site later
@@ -59,15 +73,15 @@ let storageKey = 'notate-annotations'
 // keep one shared saved object in chrome storage so popup and content script can both read it
 // chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage, async: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function, await from Eric demo, logical OR operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR
 const getStoredAnnotations = async () => {
-	const stored = await chrome.storage.local.get(storageKey)
+	const stored = await extensionStorageGet(storageKey)
 	return stored[storageKey] || {}
 }
 
 // use the current page url as the key for that page's annotation group
 // Location.href: https://developer.mozilla.org/en-US/docs/Web/API/Location/href
 // keeps each page's saved notes separated by its own url
-const getPageKey = () => {
-	return location.href
+const getPageKey = (storedAnnotations = {}, url = location.href) => {
+	return findStoredPageKey(storedAnnotations, url)
 }
 
 // save this page back into the extension storage
@@ -76,15 +90,16 @@ const getPageKey = () => {
 const saveAnnotations = async () => {
 	// instead of saving one array per page in localStorage, save this page inside the shared extension storage
 	const storedAnnotations = await getStoredAnnotations()
+	const pageKey = getPageKey(storedAnnotations)
 
-	storedAnnotations[getPageKey()] = {
+	storedAnnotations[pageKey] = {
 		title: document.title,
 		url: location.href,
 		annotations,
 		updatedAt: Date.now()
 	}
 
-	await chrome.storage.local.set({
+	await extensionStorageSet({
 		[storageKey]: storedAnnotations
 	})
 }
@@ -93,18 +108,25 @@ const saveAnnotations = async () => {
 // chrome.storage.local.get returns the shared annotation object, then this page pulls only its own annotations back out
 const loadAnnotations = async () => {
 	const storedAnnotations = await getStoredAnnotations()
-	const pageData = storedAnnotations[getPageKey()]
+	const pageData = findStoredPage(storedAnnotations, location.href)
+	const colors = await getGroupColors()
 
-	annotations = pageData?.annotations || []
+	annotations = (pageData?.annotations || []).map((annotation) => {
+		const normalized = notateNormalizeAnnotation(annotation)
+		return {
+			...normalized,
+			color: notateResolveGroupColor(normalized.group, colors, normalized.color)
+		}
+	})
 }
 
 // remove this page's saved record completely when it no longer has any annotations
 // delete operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/delete
 const removeStoredPage = async () => {
 	const storedAnnotations = await getStoredAnnotations()
-	delete storedAnnotations[getPageKey()]
+	delete storedAnnotations[getPageKey(storedAnnotations)]
 
-	await chrome.storage.local.set({
+	await extensionStorageSet({
 		[storageKey]: storedAnnotations
 	})
 }
@@ -116,6 +138,7 @@ const resetModalState = () => {
 	textarea.value = ''
 	activeTarget = null
 	editingAnnotationId = null
+	pendingInteraction = null
 }
 
 // close modal
@@ -125,19 +148,355 @@ const closeModal = () => {
 	if (!modal) return
 
 	resetModalState()
+	showNoteScreen()
 	modal.close()
+}
+
+const remToPx = () => {
+	return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+}
+
+const placeModalNear = (element) => {
+	if (!modal) return
+
+	if (!element?.isConnected) {
+		modal.style.insetBlockStart = '50%'
+		modal.style.insetInlineStart = '50%'
+		modal.style.translate = '-50% -50%'
+		requestAnimationFrame(clampModalToViewport)
+		return
+	}
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = element.getBoundingClientRect()
+	const modalRect = modal.getBoundingClientRect()
+	const fallbackModal = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-modal')) || 20)
+	const modalInline = modalRect.width || fallbackModal
+	const modalBlock = modalRect.height || fallbackModal
+	let insetInline = rect.left
+	let insetBlock = rect.bottom + gap
+
+	if (insetInline + modalInline > window.innerWidth - gap) {
+		insetInline = Math.max(gap, window.innerWidth - modalInline - gap)
+	}
+
+	if (insetBlock + modalBlock > window.innerHeight - gap) {
+		insetBlock = Math.max(gap, rect.top - modalBlock - gap)
+	}
+
+	modal.style.insetBlockStart = `${Math.round(insetBlock / rem)}rem`
+	modal.style.insetInlineStart = `${Math.round(insetInline / rem)}rem`
+	modal.style.translate = '0'
+	requestAnimationFrame(clampModalToViewport)
+}
+
+const clampModalToViewport = () => {
+	if (!modal?.open) return
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = modal.getBoundingClientRect()
+	const maxInline = Math.max(gap, window.innerWidth - rect.width - gap)
+	const maxBlock = Math.max(gap, window.innerHeight - rect.height - gap)
+	const inline = Math.min(Math.max(rect.left, gap), maxInline)
+	const block = Math.min(Math.max(rect.top, gap), maxBlock)
+
+	modal.style.insetInlineStart = `${Math.round(inline / rem)}rem`
+	modal.style.insetBlockStart = `${Math.round(block / rem)}rem`
+	modal.style.translate = '0'
+}
+
+const scaleNoteType = (text = '', element) => {
+	if (!element) return
+
+	element.style.setProperty('--note-len', String(text.length))
+}
+
+const confirmClear = () => {
+	return window.confirm('Clear every note on this page? This cannot be undone.')
+}
+
+const syncModalCopy = () => {
+	if (!modal) return
+
+	const heading = modal.querySelector('h2')
+	const hint = modal.querySelector('form > p')
+
+	if (heading) {
+		heading.textContent = editingAnnotationId ? 'Edit note' : 'New note'
+	}
+
+	if (hint) {
+		hint.textContent = editingAnnotationId
+			? 'Update why this mattered.'
+			: 'Write why it mattered.'
+	}
+}
+
+const readChosenGroup = () => {
+	const choice = form?.querySelector('[name="annotation-group-choice"]')?.value ?? ''
+	if (choice === NOTATE_NEW_GROUP) {
+		return notateNormalizeGroup(form?.querySelector('[name="annotation-group"]')?.value ?? '')
+	}
+	return notateNormalizeGroup(choice)
+}
+
+const noteScreen = () => form?.querySelector('[data-screen="note"]')
+const pickScreen = () => form?.querySelector('[data-screen="pick"]')
+const groupScreen = () => form?.querySelector('[data-screen="group"]')
+const noteActions = () => form?.querySelector('[data-note-actions]')
+const pickActions = () => form?.querySelector('[data-pick-actions]')
+const groupActions = () => form?.querySelector('[data-group-actions]')
+
+const setModalScreen = (screen) => {
+	if (!form) return
+	form.dataset.screen = screen
+	if (noteScreen()) noteScreen().hidden = screen !== 'note'
+	if (pickScreen()) pickScreen().hidden = screen !== 'pick'
+	if (groupScreen()) groupScreen().hidden = screen !== 'group'
+	if (noteActions()) noteActions().hidden = screen !== 'note'
+	if (pickActions()) pickActions().hidden = screen !== 'pick'
+	if (groupActions()) groupActions().hidden = screen !== 'group'
+}
+
+const showNoteScreen = () => {
+	setModalScreen('note')
+	syncGroupChip()
+}
+
+const showPickScreen = () => {
+	setModalScreen('pick')
+}
+
+const showGroupScreen = () => {
+	setModalScreen('group')
+	form.querySelector('[name="annotation-group"]')?.focus()
+}
+
+const syncGroupChip = async () => {
+	const chip = form?.querySelector('[data-group-chip]')
+	const add = form?.querySelector('.notate-add-group')
+	if (!chip) return
+
+	const name = readChosenGroup()
+	if (!name) {
+		chip.hidden = true
+		chip.textContent = ''
+		chip.removeAttribute('data-color')
+		if (add) add.hidden = false
+		return
+	}
+
+	const colors = await getGroupColors()
+	chip.hidden = false
+	chip.textContent = name
+	chip.dataset.color = notateResolveGroupColor(name, colors)
+	if (add) add.hidden = false
+}
+
+const setChosenGroup = (name) => {
+	const input = form?.querySelector('[name="annotation-group-choice"]')
+	const typed = form?.querySelector('[name="annotation-group"]')
+	if (input) input.value = notateNormalizeGroup(name)
+	if (typed && name !== NOTATE_NEW_GROUP) typed.value = notateNormalizeGroup(name)
+	syncGroupChip()
+}
+
+const confirmNewGroup = () => {
+	const nameInput = form?.querySelector('[name="annotation-group"]')
+	const name = notateNormalizeGroup(nameInput?.value ?? '')
+	if (!name) {
+		nameInput?.focus()
+		return false
+	}
+
+	setChosenGroup(name)
+	const color = notateNormalizeColor(form.querySelector('[name="annotation-color"]:checked')?.value)
+	if (modal) modal.dataset.color = color
+	showNoteScreen()
+	return true
+}
+
+const fillGroupPickList = async (preferred = '') => {
+	const menu = form?.querySelector('[data-group-list]')
+	const choice = form?.querySelector('[name="annotation-group-choice"]')
+	if (!menu) return
+
+	const stored = await getStoredAnnotations()
+	const colors = await getGroupColors()
+	const orderStored = await extensionStorageGet(NOTATE_GROUP_ORDER_KEY)
+	const savedOrder = Array.isArray(orderStored[NOTATE_GROUP_ORDER_KEY])
+		? orderStored[NOTATE_GROUP_ORDER_KEY]
+		: []
+	const names = notateOrderGroupNames(
+		notateCollectGroupNames(stored, colors),
+		savedOrder
+	)
+	const preferredName = notateNormalizeGroup(preferred)
+
+	menu.innerHTML = [
+		'<li><button type="button" data-action="new-group">New group</button></li>',
+		...names.map((name) => {
+			const color = notateResolveGroupColor(name, colors)
+			return `<li><button type="button" data-action="choose-group" data-group="${notateEscapeHtml(name)}" data-color="${notateEscapeHtml(color)}">${notateEscapeHtml(name)}</button></li>`
+		}),
+		'<li><button type="button" data-action="clear-group">No group</button></li>'
+	].join('')
+
+	if (choice && preferredName) choice.value = preferredName
+	const nameInput = form.querySelector('[name="annotation-group"]')
+	if (nameInput && preferredName) nameInput.value = preferredName
+	syncGroupChip()
+}
+
+const getGroupColors = async () => {
+	const stored = await extensionStorageGet(NOTATE_GROUP_COLORS_KEY)
+	return stored[NOTATE_GROUP_COLORS_KEY] || {}
+}
+
+const persistGroupColor = async (group, color) => {
+	const name = notateNormalizeGroup(group)
+	if (!name) return notateNormalizeColor(color)
+
+	const nextColor = notateNormalizeColor(color)
+	const colors = await getGroupColors()
+	colors[name] = nextColor
+	await extensionStorageSet({ [NOTATE_GROUP_COLORS_KEY]: colors })
+
+	const stored = await getStoredAnnotations()
+	const pageKey = getPageKey(stored)
+
+	Object.entries(stored).forEach(([key, page]) => {
+		if (key === pageKey) return
+		;(page.annotations || []).forEach((annotation) => {
+			if (notateNormalizeGroup(annotation.group) === name) {
+				annotation.color = nextColor
+			}
+		})
+	})
+
+	await extensionStorageSet({ [storageKey]: stored })
+	return nextColor
+}
+
+const syncLocalGroupColor = (group, color) => {
+	const name = notateNormalizeGroup(group)
+	if (!name) return
+
+	const nextColor = notateNormalizeColor(color)
+
+	annotations.forEach((annotation) => {
+		if (notateNormalizeGroup(annotation.group) === name) {
+			annotation.color = nextColor
+		}
+	})
+
+	document.querySelectorAll('.notate-note').forEach((note) => {
+		const annotation = getAnnotationById(note.dataset.id)
+		if (annotation && notateNormalizeGroup(annotation.group) === name) {
+			note.dataset.color = nextColor
+		}
+	})
+}
+
+const syncGroupColorFromName = async () => {
+	const name = readChosenGroup()
+	if (!name || !form) return
+
+	const colors = await getGroupColors()
+	const color = colors[name]
+	if (!color) return
+
+	form.querySelectorAll('[name="annotation-color"]').forEach((input) => {
+		input.checked = input.value === color
+	})
+	if (modal) modal.dataset.color = notateNormalizeColor(color)
+}
+
+const syncModalFields = async (annotation) => {
+	const preferredGroup = annotation?.group || pendingGroup || ''
+	await fillGroupPickList(preferredGroup)
+
+	const colors = await getGroupColors()
+	const groupName = readChosenGroup()
+	const color = notateResolveGroupColor(groupName, colors, annotation?.color)
+	modal.dataset.color = color
+
+	form.querySelectorAll('[name="annotation-color"]').forEach((input) => {
+		input.checked = input.value === color
+	})
+
+	const interaction = notateNormalizeInteraction(annotation?.interaction || pendingInteraction || {}, activeTarget)
+	form.querySelectorAll('[name="annotation-state"]').forEach((input) => {
+		input.checked = input.value === interaction.kind
+	})
+}
+
+const readModalMeta = () => {
+	const current = editingAnnotationId ? getAnnotationById(editingAnnotationId) : null
+
+	return {
+		text: textarea.value.trim(),
+		color: notateNormalizeColor(
+			form.querySelector('[name="annotation-color"]:checked')?.value || current?.color
+		),
+		group: readChosenGroup(),
+		interaction: notateNormalizeInteraction({
+			kind: form.querySelector('[name="annotation-state"]:checked')?.value
+				|| current?.interaction?.kind
+				|| pendingInteraction?.kind,
+			cursor: pendingInteraction?.cursor || current?.interaction?.cursor || notateReadCursor(activeTarget),
+			scrollY: pendingInteraction?.scrollY ?? current?.interaction?.scrollY ?? Math.round(window.scrollY)
+		}, activeTarget)
+	}
+}
+
+const inferStateKind = (element, event = {}) => {
+	if (event.shiftKey) return 'cursor'
+	if (event.buttons) return 'active'
+	if (element && document.activeElement === element) return 'focus'
+	return 'hover'
+}
+
+const captureLiveInteraction = (element, kind) => {
+	return notateNormalizeInteraction({
+		kind,
+		cursor: notateReadCursor(element),
+		scrollY: Math.round(window.scrollY)
+	}, element)
+}
+
+const pointerTargetAt = (x, y) => {
+	const hit = document.elementFromPoint(x, y)
+	if (!hit || isBlockedHoverTarget(hit) || isRootHoverTarget(hit)) return null
+	return hit
+}
+
+const openCaptureModal = (kind, event = {}) => {
+	const target = lastPointerTarget?.isConnected
+		? lastPointerTarget
+		: pointerTargetAt(event.clientX ?? lastPointerX, event.clientY ?? lastPointerY)
+	if (!target) return
+
+	pendingInteraction = captureLiveInteraction(target, kind)
+	openCreateModal(target)
 }
 
 // open modal to create a new annotation
 // HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
 // stores the clicked target in activeTarget, clears edit mode, opens modal
-const openCreateModal = (target) => {
+const openCreateModal = async (target) => {
 	createModal()
 
 	activeTarget = target
 	editingAnnotationId = null
 	textarea.value = ''
+	scaleNoteType('', textarea)
+	await syncModalFields({ group: pendingGroup })
+	syncModalCopy()
 	modal.showModal()
+	placeModalNear(target)
 }
 
 // open the modal with an existing annotation
@@ -149,30 +508,89 @@ const openEditModal = (annotation) => {
 	editingAnnotationId = annotation.id
 	activeTarget = document.querySelector(annotation.selector)
 	textarea.value = annotation.text
+	scaleNoteType(annotation.text, textarea)
+	syncModalFields(annotation)
+	syncModalCopy()
 	modal.showModal()
+	placeModalNear(activeTarget)
 }
 
 // place clear and exit buttons in toolbar when annotation mode is on
 // Document.createElement: https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement, Element.append: https://developer.mozilla.org/en-US/docs/Web/API/Element/append
 // builds #notate-toolbar, fills it with the two buttons, inserts it into document.body to show up on page
 const createToolbar = () => {
-	if (toolbar) return
+	if (!toolbar) {
+		toolbar = document.createElement('aside')
+		toolbar.id = 'notate-toolbar'
 
-	toolbar = document.createElement('aside')
-	toolbar.id = 'notate-toolbar'
+		toolbar.innerHTML = `
+			<p></p>
+			<menu class="notate-toolbar-group">
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="edit">
+						New
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="preview">
+						Done
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="move">
+						Reposition
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="clear">
+						Clear
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="exit">
+						Done
+					</button>
+				</li>
+			</menu>
+		`
 
-	toolbar.innerHTML = `
-		<div class="notate-toolbar-group">
-			<button class="notate-toolbar-button" type="button" data-action="clear">
-				Clear all
-			</button>
-			<button class="notate-toolbar-button" type="button" data-action="exit">
-				Exit Notate
-			</button>
-		</div>
-	`
+		toolbar.setAttribute('aria-label', 'Notate')
+		document.body.append(toolbar)
+	}
 
-	document.body.append(toolbar)
+	refreshToolbar()
+}
+
+const refreshToolbar = () => {
+	if (!toolbar) return
+
+	toolbar.classList.toggle('is-previewing', isPreviewing)
+	toolbar.classList.toggle('is-annotating', isAnnotating)
+	toolbar.classList.toggle('is-moving', isMoving)
+
+	const status = toolbar.querySelector(':scope > p')
+	if (status) {
+		if (isMoving) {
+			status.textContent = 'Drag to move'
+		} else if (isAnnotating) {
+			status.textContent = 'Click to mark'
+		} else {
+			status.textContent = ''
+		}
+	}
+
+	const labels = {
+		preview: 'Done',
+		edit: 'New',
+		move: 'Reposition',
+		clear: 'Clear',
+		exit: 'Done'
+	}
+
+	toolbar.querySelectorAll('[data-action]').forEach((button) => {
+		const label = labels[button.dataset.action]
+		if (label) button.textContent = label
+	})
 }
 
 // remove toolbar when annotate mode off
@@ -207,13 +625,64 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<textarea id="annotation-text" name="annotation-text"></textarea>
-			<menu>
+			<section data-screen="note">
+				<textarea id="annotation-text" name="annotation-text" aria-label="New note" placeholder="New note"></textarea>
+				<footer class="notate-group-bar">
+					<button type="button" data-group-chip data-action="pick-group" hidden></button>
+					<button type="button" class="notate-add-group" data-action="pick-group">Add to group</button>
+				</footer>
+			</section>
+			<section data-screen="pick" hidden>
+				<menu data-group-list>
+					<li>
+						<button type="button" data-action="new-group">New group</button>
+					</li>
+				</menu>
+			</section>
+			<section data-screen="group" hidden>
+				<input name="annotation-group" placeholder="Group name" aria-label="Group name" autocomplete="off">
+				<fieldset>
+					<legend>Group color</legend>
+					<label data-color="yellow">
+						<input type="radio" name="annotation-color" value="yellow" aria-label="Yellow" checked>
+					</label>
+					<label data-color="mint">
+						<input type="radio" name="annotation-color" value="mint" aria-label="Mint">
+					</label>
+					<label data-color="sky">
+						<input type="radio" name="annotation-color" value="sky" aria-label="Sky">
+					</label>
+					<label data-color="peach">
+						<input type="radio" name="annotation-color" value="peach" aria-label="Peach">
+					</label>
+					<label data-color="lilac">
+						<input type="radio" name="annotation-color" value="lilac" aria-label="Lilac">
+					</label>
+					<label data-color="rose">
+						<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
+					</label>
+				</fieldset>
+			</section>
+			<input type="hidden" name="annotation-group-choice" value="">
+			<menu data-note-actions>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
-					<button type="submit" name="intent" value="save">Save</button>
+					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save</button>
+				</li>
+			</menu>
+			<menu data-pick-actions hidden>
+				<li>
+					<button type="button" data-action="back-note">Back</button>
+				</li>
+			</menu>
+			<menu data-group-actions hidden>
+				<li>
+					<button type="button" data-action="back-pick">Back</button>
+				</li>
+				<li>
+					<button type="button" data-action="confirm-group">Save group</button>
 				</li>
 			</menu>
 		</form>
@@ -226,6 +695,57 @@ const createModal = () => {
 	textarea = modal.querySelector('textarea')
 
 	form.addEventListener('submit', onModalSubmit)
+	textarea.addEventListener('input', () => {
+		scaleNoteType(textarea.value, textarea)
+	})
+	form.addEventListener('click', (event) => {
+		const action = event.target.closest('[data-action]')?.dataset.action
+		if (!action) return
+
+		if (action === 'pick-group') {
+			fillGroupPickList(readChosenGroup()).then(showPickScreen)
+			return
+		}
+		if (action === 'new-group') {
+			const nameInput = form.querySelector('[name="annotation-group"]')
+			if (nameInput) nameInput.value = ''
+			showGroupScreen()
+			return
+		}
+		if (action === 'choose-group') {
+			const name = event.target.closest('[data-action="choose-group"]')?.dataset.group || ''
+			setChosenGroup(name)
+			syncGroupColorFromName()
+			showNoteScreen()
+			return
+		}
+		if (action === 'clear-group') {
+			setChosenGroup('')
+			if (modal) modal.dataset.color = NOTATE_COLOR_DEFAULT
+			showNoteScreen()
+			return
+		}
+		if (action === 'back-note') {
+			showNoteScreen()
+			return
+		}
+		if (action === 'back-pick') {
+			showPickScreen()
+			return
+		}
+		if (action === 'confirm-group') {
+			confirmNewGroup()
+		}
+	})
+	form.querySelector('[name="annotation-group"]')?.addEventListener('keydown', (event) => {
+		if (event.key !== 'Enter') return
+		event.preventDefault()
+		confirmNewGroup()
+	})
+	modal.addEventListener('change', (event) => {
+		if (event.target.name !== 'annotation-color') return
+		modal.dataset.color = event.target.value
+	})
 }
 
 // give each annotation its own id to reference
@@ -279,10 +799,11 @@ const getAnnotationById = (id) => {
 // stacks notes on the same target by adding heights of annotations that come before this one in the saved array
 // using array order instead of DOM order avoids measuring the note itself or notes below it
 // HTMLElement.offsetHeight: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight
-const getNotePosition = (target, selector, annotationId) => {
+const getBaseNotePosition = (target, selector, annotationId) => {
+	const rem = remToPx()
 	const rect = target.getBoundingClientRect()
-	const gap = 8
-	const noteWidth = 12 * 16
+	const gap = rem / 2
+	const noteWidth = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-note')) || 18)
 	const viewportLeft = window.scrollX
 	const viewportRight = window.scrollX + window.innerWidth
 
@@ -316,6 +837,78 @@ const getNotePosition = (target, selector, annotationId) => {
 	}
 
 	return { top, left }
+}
+
+const getNotePosition = (target, selector, annotationId) => {
+	const rem = remToPx()
+	const gap = rem / 2
+	const noteWidth = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-note')) || 18)
+	const viewportLeft = window.scrollX
+	const viewportRight = window.scrollX + window.innerWidth
+	const base = getBaseNotePosition(target, selector, annotationId)
+	let left = base.left
+	let top = base.top
+
+	const annotation = getAnnotationById(annotationId)
+	left += annotation?.offsetInline || 0
+	top += annotation?.offsetBlock || 0
+
+	const maxNoteWidth = Math.min(noteWidth, window.innerWidth - gap * 2)
+	if (left + maxNoteWidth > viewportRight - gap) {
+		left = viewportRight - maxNoteWidth - gap
+	}
+	if (left < viewportLeft + gap) {
+		left = viewportLeft + gap
+	}
+
+	return { top, left }
+}
+
+const snapNoteToTargetBorder = (annotation, noteEl, clientX, clientY) => {
+	const target = document.querySelector(annotation.selector)
+	if (!target || !noteEl) return
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = target.getBoundingClientRect()
+	const noteWidth = noteEl.offsetWidth || rem * 8
+	const noteHeight = noteEl.offsetHeight || rem * 3
+	const distRight = Math.abs(clientX - rect.right)
+	const distLeft = Math.abs(clientX - rect.left)
+	const distTop = Math.abs(clientY - rect.top)
+	const distBottom = Math.abs(clientY - rect.bottom)
+	const nearest = Math.min(distRight, distLeft, distTop, distBottom)
+
+	let left
+	let top
+	if (nearest === distRight) {
+		left = rect.right + window.scrollX + gap
+		top = clientY + window.scrollY - noteHeight / 2
+		top = Math.min(Math.max(top, rect.top + window.scrollY), rect.bottom + window.scrollY - Math.min(noteHeight, rect.height || noteHeight))
+	} else if (nearest === distLeft) {
+		left = rect.left + window.scrollX - noteWidth - gap
+		top = clientY + window.scrollY - noteHeight / 2
+		top = Math.min(Math.max(top, rect.top + window.scrollY), rect.bottom + window.scrollY - Math.min(noteHeight, rect.height || noteHeight))
+	} else if (nearest === distTop) {
+		top = rect.top + window.scrollY - noteHeight - gap
+		left = clientX + window.scrollX - noteWidth / 2
+		left = Math.min(Math.max(left, rect.left + window.scrollX), rect.right + window.scrollX - Math.min(noteWidth, rect.width || noteWidth))
+	} else {
+		top = rect.bottom + window.scrollY + gap
+		left = clientX + window.scrollX - noteWidth / 2
+		left = Math.min(Math.max(left, rect.left + window.scrollX), rect.right + window.scrollX - Math.min(noteWidth, rect.width || noteWidth))
+	}
+
+	const minLeft = window.scrollX + gap
+	const minTop = window.scrollY + gap
+	const maxLeft = window.scrollX + window.innerWidth - noteWidth - gap
+	const maxTop = window.scrollY + window.innerHeight - noteHeight - gap
+	left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft))
+	top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop))
+
+	const base = getBaseNotePosition(target, annotation.selector, annotation.id)
+	annotation.offsetInline = Math.round(left - base.left)
+	annotation.offsetBlock = Math.round(top - base.top)
 }
 
 // outline the targeted element
@@ -389,15 +982,22 @@ const renderAnnotation = (annotation) => {
 	const note = document.createElement('aside')
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
+	note.dataset.color = notateNormalizeColor(annotation.color)
+	note.dataset.state = notateNormalizeState(annotation.interaction?.kind)
+
+	const stateLabel = notateInteractionLabel(annotation.interaction)
 
 	// "x" corner button to delete the annotation, inserting through html
 	note.innerHTML = `
 		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
-		<p>${annotation.text}</p>
+		<p>${notateEscapeHtml(annotation.text)}</p>
+		${stateLabel ? `<small>${notateEscapeHtml(stateLabel)}</small>` : ''}
 	`
 
 	note.style.insetBlockStart = `${position.top}px`
 	note.style.insetInlineStart = `${position.left}px`
+	scaleNoteType(annotation.text, note)
+	scaleNoteType(annotation.text, note.querySelector('p'))
 
 	layer.append(note)
 }
@@ -421,12 +1021,18 @@ const renderAllAnnotations = () => {
 // saving a new note to create the object, store it, and show it right away
 // Array.push: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push
 // builds a new annotation from activeTarget and text, inserts into annotations, saves it, renders it
-const createAnnotation = async (text) => {
-	const annotation = {
+const createAnnotation = async (text, color, group, interaction) => {
+	const annotation = notateNormalizeAnnotation({
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
-		text
-	}
+		text,
+		color,
+		group,
+		offsetInline: 0,
+		offsetBlock: 0,
+		createdAt: Date.now(),
+		interaction: notateNormalizeInteraction(interaction || pendingInteraction, activeTarget)
+	})
 
 	annotations.push(annotation)
 
@@ -437,15 +1043,36 @@ const createAnnotation = async (text) => {
 // editing a note updates both the saved data and the visible note text
 // Node.textContent: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
 // updates the matching annotation object, saves annotations, updates the <p> inside .notate-note[data-id="${id}"]
-const updateAnnotation = async (id, text) => {
+const updateAnnotation = async (id, text, color, group, interaction) => {
 	const annotation = getAnnotationById(id)
+	if (!annotation) return
 	annotation.text = text
+	annotation.color = notateNormalizeColor(color)
+	annotation.group = notateNormalizeGroup(group)
+	annotation.interaction = notateNormalizeInteraction(interaction || pendingInteraction, activeTarget)
 
 	await saveAnnotations()
 
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	if (!note) return
+
+	note.dataset.color = annotation.color
+	note.dataset.state = notateNormalizeState(annotation.interaction.kind)
 	const noteText = note.querySelector('p')
 	noteText.textContent = text
+	const stateLabel = notateInteractionLabel(annotation.interaction)
+	let meta = note.querySelector('small')
+	if (stateLabel) {
+		if (!meta) {
+			meta = document.createElement('small')
+			note.append(meta)
+		}
+		meta.textContent = stateLabel
+	} else {
+		meta?.remove()
+	}
+	scaleNoteType(text, note)
+	scaleNoteType(text, noteText)
 }
 
 // clicking the x fully removes that annotation everywhere
@@ -453,6 +1080,7 @@ const updateAnnotation = async (id, text) => {
 // unhighlights the target, filters the item out of annotations, saves again, removes that note element from page
 const deleteAnnotation = async (id) => {
 	const annotation = getAnnotationById(id)
+	if (!annotation) return
 
 	unhighlightTarget(annotation.selector)
 
@@ -469,12 +1097,14 @@ const deleteAnnotation = async (id) => {
 
 	// grab annotation by id, unhighlight its target, filter it out of annotations array, save again, then find the note element by id and remove it from the page
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
-	note.remove()
+	note?.remove()
 }
 
 // clear this page's annotations everywhere at once
 // resets annotations to an empty array, removes this page from extension storage, clears the layer
 const clearAnnotations = async () => {
+	if (!confirmClear()) return
+
 	clearHighlights()
 
 	annotations = []
@@ -487,8 +1117,33 @@ const clearAnnotations = async () => {
 // DOMTokenList.add: https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/add
 // sets isAnnotating = true, adds 'is-annotating' on document.documentElement, creates toolbar, renders notes
 const startAnnotating = () => {
+	isPreviewing = false
+	isMoving = false
 	isAnnotating = true
+	document.documentElement.classList.remove('is-previewing', 'is-moving')
 	document.documentElement.classList.add('is-annotating')
+	createToolbar()
+	renderAllAnnotations()
+}
+
+const startPreviewing = () => {
+	isAnnotating = false
+	isMoving = false
+	isPreviewing = true
+	document.documentElement.classList.remove('is-annotating', 'is-moving')
+	document.documentElement.classList.add('is-previewing')
+	clearHoverFill()
+	createToolbar()
+	renderAllAnnotations()
+}
+
+const startMoving = () => {
+	isPreviewing = false
+	isAnnotating = false
+	isMoving = true
+	document.documentElement.classList.remove('is-previewing', 'is-annotating')
+	document.documentElement.classList.add('is-moving')
+	clearHoverFill()
 	createToolbar()
 	renderAllAnnotations()
 }
@@ -497,12 +1152,15 @@ const startAnnotating = () => {
 // sets isAnnotating = false, removes 'is-annotating', removes toolbar, hides layer, clears highlights
 const stopAnnotating = () => {
 	isAnnotating = false
-	document.documentElement.classList.remove('is-annotating')
+	isPreviewing = false
+	isMoving = false
+	document.documentElement.classList.remove('is-annotating', 'is-previewing', 'is-moving')
 	removeToolbar()
 	hideLayer()	
 	if (modal?.open) {
 		closeModal()
 	}
+	clearHoverFill()
 	clearHighlights()
 }
 
@@ -515,31 +1173,50 @@ const toggleAnnotating = () => {
 
 // Event.preventDefault: https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault, SubmitEvent.submitter: https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter
 // consolidate to one function so it reads event.submitter.value and textarea.value.trim() to either cancel, ignore blank text, update an existing note, or create a new one
-const onModalSubmit = async (event) => {
-	event.preventDefault()
-
-	const formData = new FormData(form)
-	const submitValue = event.submitter?.value || formData.get('intent') || 'save'
-	const text = textarea.value.trim()
-
-	if (submitValue === 'cancel') {
-		closeModal()
-		return
-	}
+const saveFromModal = async () => {
+	const { text, color, group, interaction } = readModalMeta()
 
 	if (!text) {
 		closeModal()
 		return
 	}
 
+	if (group) {
+		syncLocalGroupColor(group, color)
+		await persistGroupColor(group, color)
+	}
+
 	if (editingAnnotationId) {
-		await updateAnnotation(editingAnnotationId, text)
+		await updateAnnotation(editingAnnotationId, text, color, group, interaction)
 		closeModal()
 		return
 	}
 
-	await createAnnotation(text)
+	await createAnnotation(text, color, group, interaction)
 	closeModal()
+}
+
+const onModalSubmit = async (event) => {
+	event.preventDefault()
+
+	const formData = new FormData(form)
+	const submitValue = event.submitter?.value || formData.get('intent') || 'save'
+
+	if (submitValue === 'cancel') {
+		closeModal()
+		return
+	}
+
+	if (form?.dataset.screen === 'group') {
+		confirmNewGroup()
+		return
+	}
+
+	if (form?.dataset.screen === 'pick') {
+		return
+	}
+
+	await saveFromModal()
 }
 
 // click the x button inside a note to delete only that note
@@ -564,12 +1241,22 @@ const onPageClick = (event) => {
 	const clickedInsideBlockedUi = blockedSelectors.some((selector) => {
 		return event.target.closest(selector)
 	})
+	const clickedRoot = event.target === document.body || event.target === document.documentElement
 
-	if (!isAnnotating || modal?.open || clickedInsideBlockedUi) return
+	if (isPreviewing && event.altKey && !modal?.open && !clickedInsideBlockedUi && !clickedRoot) {
+		event.preventDefault()
+		event.stopPropagation()
+		lastPointerTarget = event.target
+		openCaptureModal(inferStateKind(event.target, event), event)
+		return
+	}
+
+	if (!isAnnotating || modal?.open || clickedInsideBlockedUi || clickedRoot) return
 
 	event.preventDefault()
 	event.stopPropagation()
 
+	pendingInteraction = captureLiveInteraction(event.target, event.altKey ? inferStateKind(event.target, event) : 'default')
 	openCreateModal(event.target)
 }
 
@@ -578,6 +1265,10 @@ const onPageClick = (event) => {
 // ignores the delete button, finds the clicked .notate-note, gets its id from note.dataset.id, opens that annotation in edit mode
 const onNoteClick = (event) => {
 	if (event.target.closest('.notate-delete')) return
+	if (isMoving || noteDidDrag || noteDrag?.moved) {
+		noteDidDrag = false
+		return
+	}
 
 	const note = event.target.closest('.notate-note')
 	if (!note) return
@@ -599,6 +1290,9 @@ const onToolbarClick = async (event) => {
 	const button = event.target.closest('#notate-toolbar [data-action]')
 	const action = button?.dataset.action
 	const toolbarActions = {
+		preview: startPreviewing,
+		edit: startAnnotating,
+		move: startMoving,
 		clear: clearAnnotations,
 		exit: stopAnnotating
 	}
@@ -614,7 +1308,20 @@ const onToolbarClick = async (event) => {
 // Escape key exits annotation mode
 // KeyboardEvent.key: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key
 const onKeydown = (event) => {
-	if (event.key !== 'Escape' || !isAnnotating) return
+	if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && modal?.open) {
+		event.preventDefault()
+		saveFromModal()
+		return
+	}
+
+	if (event.altKey && !event.metaKey && !event.ctrlKey && (event.key === 'a' || event.key === 'A') && !modal?.open && (isAnnotating || isPreviewing || isMoving)) {
+		event.preventDefault()
+		openCaptureModal(inferStateKind(lastPointerTarget, event), event)
+		return
+	}
+
+	if (event.key !== 'Escape' || (!isAnnotating && !isPreviewing && !isMoving)) return
+	if (modal?.open) return
 
 	stopAnnotating()
 }
@@ -627,7 +1334,9 @@ const onKeydown = (event) => {
 const repositionNote = (note) => {
 	const id = note.dataset.id
 	const annotation = getAnnotationById(id)
-	const target = document.querySelector(annotation.selector)
+	const target = document.querySelector(annotation?.selector)
+	if (!annotation || !target) return
+
 	const position = getNotePosition(target, annotation.selector, annotation.id)
 
 	note.style.insetBlockStart = `${position.top}px`
@@ -640,7 +1349,7 @@ const repositionNote = (note) => {
 // NodeList.forEach: https://developer.mozilla.org/en-US/docs/Web/API/NodeList/forEach
 // only runs while annotating so this isn't doing extra work all the time
 const repositionAnnotations = () => {
-	if (!isAnnotating || !layer) return
+	if ((!isAnnotating && !isPreviewing && !isMoving) || !layer) return
 
 	layer.querySelectorAll('.notate-note').forEach((note) => {
 		repositionNote(note)
@@ -670,25 +1379,50 @@ const scrollToFirstAnnotation = () => {
 // Document.visibilityState: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState
 // visibilitychange event: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
 // Element.scrollIntoView: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
-const enterAnnotationMode = async (scroll = false, selector = null) => {
+const showNotesOnPage = async (mode = 'annotate', scroll = false, selector = null) => {
 	await loadAnnotations()
-	startAnnotating()
+	if (mode === 'preview') startPreviewing()
+	else startAnnotating()
 
 	if (!scroll) return
 
 	const scrollTarget = () => {
-		const target = selector
-			? document.querySelector(selector)
-			: document.querySelector(annotations[0]?.selector)
+		const annotation = selector
+			? annotations.find((item) => item.selector === selector)
+			: annotations[0]
+		const target = annotation
+			? document.querySelector(annotation.selector)
+			: document.querySelector(selector)
+
+		if (annotation?.interaction?.kind === 'scroll' && Number.isFinite(annotation.interaction.scrollY)) {
+			window.scrollTo({ top: annotation.interaction.scrollY, behavior: 'smooth' })
+			return
+		}
 
 		if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 	}
 
+	const runScroll = () => requestAnimationFrame(scrollTarget)
+
 	if (document.visibilityState === 'visible') {
-		requestAnimationFrame(scrollTarget)
-	} else {
-		document.addEventListener('visibilitychange', scrollTarget, { once: true })
+		runScroll()
+		setTimeout(runScroll, 250)
+		return
 	}
+
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState !== 'visible') return
+		runScroll()
+		setTimeout(runScroll, 250)
+	}, { once: true })
+}
+
+const enterAnnotationMode = async (scroll = false, selector = null) => {
+	await showNotesOnPage('annotate', scroll, selector)
+}
+
+const enterPreviewMode = async (scroll = false, selector = null) => {
+	await showNotesOnPage('preview', scroll, selector)
 }
 
 // when page loads, pull this page's annotations from shared extension storage
@@ -697,17 +1431,22 @@ const enterAnnotationMode = async (scroll = false, selector = null) => {
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
 // async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
 const initAnnotations = async () => {
+	if (!getExtensionStorage()) return
+
 	await loadAnnotations()
 
-	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector'])
+	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode', 'notate-pending-group'])
 	const pendingUrl = stored['notate-pending-url']
+	const pendingAge = Date.now() - (stored['notate-pending-at'] || 0)
+	pendingGroup = notateNormalizeGroup(stored['notate-pending-group'] || '')
 
-	if (pendingUrl !== location.href) return
+	if (!pendingUrl || pendingAge > 15000 || !pageUrlsMatch(pendingUrl, location.href)) return
 
-	await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector'])
+	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode', 'notate-pending-group'])
 
 	const pendingSelector = stored['notate-pending-selector'] || null
-	enterAnnotationMode(true, pendingSelector)
+	const pendingMode = stored['notate-pending-mode'] === 'annotate' ? 'annotate' : 'preview'
+	showNotesOnPage(pendingMode, true, pendingSelector)
 }
 
 initAnnotations()
@@ -721,47 +1460,176 @@ document.addEventListener('click', onPageClick, true)
 document.addEventListener('click', onNoteClick, true)
 document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
+document.addEventListener('keyup', (event) => {
+	if (event.key === 'Alt' && isPreviewing) clearHoverFill()
+})
+document.addEventListener('pointerdown', (event) => {
+	if ((!isMoving && !isAnnotating && !isPreviewing) || event.button !== 0) return
+	if (event.target.closest('.notate-delete')) return
+
+	const note = event.target.closest('.notate-note')
+	if (!note) return
+
+	const annotation = getAnnotationById(note.dataset.id)
+	if (!annotation) return
+
+	noteDidDrag = false
+	noteDrag = {
+		id: annotation.id,
+		startX: event.clientX,
+		startY: event.clientY,
+		originInline: annotation.offsetInline || 0,
+		originBlock: annotation.offsetBlock || 0,
+		moved: false
+	}
+	note.setPointerCapture(event.pointerId)
+}, true)
+
+document.addEventListener('pointermove', (event) => {
+	if (!noteDrag) return
+
+	const deltaX = event.clientX - noteDrag.startX
+	const deltaY = event.clientY - noteDrag.startY
+	if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+		noteDrag.moved = true
+		noteDidDrag = true
+	}
+
+	const annotation = getAnnotationById(noteDrag.id)
+	if (!annotation) return
+
+	const noteEl = layer?.querySelector(`.notate-note[data-id="${annotation.id}"]`)
+	if (noteDrag.moved && noteEl) {
+		snapNoteToTargetBorder(annotation, noteEl, event.clientX, event.clientY)
+	} else {
+		annotation.offsetInline = Math.round(noteDrag.originInline + deltaX)
+		annotation.offsetBlock = Math.round(noteDrag.originBlock + deltaY)
+	}
+	repositionAnnotations()
+}, true)
+
+document.addEventListener('pointerup', async () => {
+	if (!noteDrag) return
+
+	const dragged = noteDrag
+	noteDrag = null
+	if (!dragged.moved) return
+
+	await saveAnnotations()
+}, true)
+
+document.addEventListener('pointercancel', () => {
+	noteDrag = null
+}, true)
 
 // add hover fill to only the exact element under the cursor not with CSS :hover because couldn't keep the hover state to just the hovered element. it was spreading to the whole parent if the hovered element didn't have its own background.
 // closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
 const blockedHoverSelectors = ['#notate-modal', '#notate-toolbar', '.notate-note']
 const isBlockedHoverTarget = (el) => blockedHoverSelectors.some((s) => el.closest(s))
+const isRootHoverTarget = (el) => el === document.body || el === document.documentElement
+
+const coyoteMs = () => {
+	const value = getComputedStyle(document.documentElement).getPropertyValue('--duration-md').trim()
+	const parsed = parseFloat(value)
+	return Number.isFinite(parsed) ? parsed : 180
+}
 
 // overlay a temporary yellow div over images on hover since background-color doesn't work over <img>
 let hoverOverlay = null
+let hoveredEl = null
+let hoverLeaveTimer = null
+
+function clearHoverFill() {
+	if (hoverOverlay) {
+		hoverOverlay.remove()
+		hoverOverlay = null
+	}
+
+	if (hoveredEl?.classList.contains('notate-hover')) {
+		hoveredEl.classList.remove('notate-hover')
+	}
+
+	hoveredEl = null
+}
+
+const placeHoverOverlay = (element) => {
+	if (!element) return
+
+	const rect = element.getBoundingClientRect()
+	if (!hoverOverlay) {
+		hoverOverlay = document.createElement('div')
+		hoverOverlay.id = 'notate-img-overlay'
+		document.body.append(hoverOverlay)
+	}
+
+	hoverOverlay.style.insetBlockStart = `${rect.top}px`
+	hoverOverlay.style.insetInlineStart = `${rect.left}px`
+	hoverOverlay.style.inlineSize = `${rect.width}px`
+	hoverOverlay.style.blockSize = `${rect.height}px`
+}
+
+const shouldAimOverlay = (event) => {
+	if (modal?.open) return false
+	if (isAnnotating) return true
+	if (isPreviewing && event.altKey) return true
+	return false
+}
+
+document.addEventListener('pointermove', (event) => {
+	if (!isAnnotating && !isPreviewing && !isMoving) return
+	if (isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+
+	lastPointerX = event.clientX
+	lastPointerY = event.clientY
+	lastPointerTarget = event.target
+
+	if (shouldAimOverlay(event)) {
+		window.clearTimeout(hoverLeaveTimer)
+		hoveredEl = event.target
+		placeHoverOverlay(event.target)
+		return
+	}
+
+	if (isPreviewing) clearHoverFill()
+}, true)
 
 document.addEventListener('mouseover', (event) => {
-	if (!isAnnotating || isBlockedHoverTarget(event.target)) return
+	if (!shouldAimOverlay(event) || isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+
+	window.clearTimeout(hoverLeaveTimer)
+	hoveredEl = event.target
 
 	// check for if it's an image because background-color wasn't working on img elements, so i needed to make a separate hover state for them that puts a yellow overlay div on top of the image instead of trying to change the image's background-color
 	// googled: "how to check if element is an image javascript" and found tagName property as second option which took me to this: https://www.encodedna.com/javascript/check-if-element-is-an-image-using-javascript-tagname-property.htm#:~:text=Let%20us%20assume%20I%20have,the%20ID%20of%20each%20image.
 	if (event.target.tagName === 'IMG') {
 		// used same getBoundingClientRect from getNotePosition to position the hoverOverlay exactly on top of the image, then add it to the body so it shows up on top of the image with a yellow background
 		const rect = event.target.getBoundingClientRect()
-		hoverOverlay = document.createElement('div')
-		// id styled in webpage.css
-		hoverOverlay.id = 'notate-img-overlay'
+		if (!hoverOverlay) {
+			hoverOverlay = document.createElement('div')
+			// id styled in webpage.css
+			hoverOverlay.id = 'notate-img-overlay'
+			// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+			document.body.append(hoverOverlay)
+		}
 		hoverOverlay.style.insetBlockStart = `${rect.top}px`
 		hoverOverlay.style.insetInlineStart = `${rect.left}px`
 		hoverOverlay.style.inlineSize = `${rect.width}px`
 		hoverOverlay.style.blockSize = `${rect.height}px`
-		// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
-		document.body.append(hoverOverlay)
 	} else {
-		event.target.classList.add('notate-hover')
+		placeHoverOverlay(event.target)
 	}
 }, true)
 
 // mouseover/mouseout: https://developer.mozilla.org/en-US/docs/Web/API/Element/mouseover_event
 document.addEventListener('mouseout', (event) => {
-	if (!isAnnotating) return
+	if (!isAnnotating && !(isPreviewing && event.altKey)) return
 
-	if (hoverOverlay) {
-		hoverOverlay.remove()
-		hoverOverlay = null
-	} else {
-		event.target.classList.remove('notate-hover')
-	}
+	const leaving = event.target
+
+	hoverLeaveTimer = window.setTimeout(() => {
+		if (hoveredEl !== leaving) return
+		clearHoverFill()
+	}, coyoteMs())
 }, true)
 
 window.addEventListener('scroll', repositionAnnotations)
@@ -771,10 +1639,17 @@ window.addEventListener('resize', repositionAnnotations)
 // listen for popup messages like start annotating or clear this page
 // runs a selector through for already-open tabs so they scroll to the right annotation
 // chrome.runtime.onMessage: https://developer.chrome.com/docs/extensions/reference/api/runtime
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+	if (message.action === 'notate-ping') {
+		sendResponse({ ok: true })
+		return
+	}
+
 	const runtimeActions = {
 		'enter-annotation-mode': () => enterAnnotationMode(false),
 		'enter-annotation-mode-scroll': () => enterAnnotationMode(true, message.selector || null),
+		'enter-preview-mode': () => enterPreviewMode(false),
+		'enter-preview-mode-scroll': () => enterPreviewMode(true, message.selector || null),
 		'toggle-annotate-mode': toggleAnnotating,
 		'clear-annotations': clearAnnotations
 	}
@@ -782,5 +1657,10 @@ chrome.runtime.onMessage.addListener((message) => {
 
 	if (!action) return
 
+	if (Object.hasOwn(message, 'group')) {
+		pendingGroup = notateNormalizeGroup(message.group)
+	}
+
 	action()
 })
+})()
