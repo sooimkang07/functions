@@ -29,7 +29,7 @@
 
 		<aside class="popup-onboard" hidden>
 			<h2>Capture what caught you</h2>
-			<p>Click New, then click anything on the page. Write why it mattered. Pick an existing group, or choose New group and name it.</p>
+			<p>Click New, then click anything on the page. Write why it mattered. Choose an existing group, or + New Group to name it and pick a color. Right-click a group tab to rename, recolor, or delete it.</p>
 			<button type="button" data-action="dismiss-onboard">Continue</button>
 		</aside>
 
@@ -49,5 +49,52 @@
 
 		<footer>
 		</footer>
+
+		<menu id="group-tab-menu" hidden>
+			<li>
+				<button type="button" data-action="rename-group">Rename</button>
+			</li>
+			<li>
+				<button type="button" data-action="recolor-group">Color</button>
+			</li>
+			<li>
+				<button type="button" data-action="delete-group">Delete</button>
+			</li>
+		</menu>
+
+		<dialog id="group-edit-dialog">
+			<form method="dialog">
+				<input name="group-name" placeholder="Group name" aria-label="Group name" autocomplete="off">
+				<fieldset>
+					<legend>Color</legend>
+					<label data-color="yellow">
+						<input type="radio" name="group-color" value="yellow" aria-label="Yellow" checked>
+					</label>
+					<label data-color="mint">
+						<input type="radio" name="group-color" value="mint" aria-label="Mint">
+					</label>
+					<label data-color="sky">
+						<input type="radio" name="group-color" value="sky" aria-label="Sky">
+					</label>
+					<label data-color="peach">
+						<input type="radio" name="group-color" value="peach" aria-label="Peach">
+					</label>
+					<label data-color="lilac">
+						<input type="radio" name="group-color" value="lilac" aria-label="Lilac">
+					</label>
+					<label data-color="rose">
+						<input type="radio" name="group-color" value="rose" aria-label="Rose">
+					</label>
+				</fieldset>
+				<menu>
+					<li>
+						<button type="submit" value="cancel">Cancel</button>
+					</li>
+					<li>
+						<button type="submit" value="save">Save</button>
+					</li>
+				</menu>
+			</form>
+		</dialog>
 	</body>
 </html>

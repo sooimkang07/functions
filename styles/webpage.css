@@ -373,6 +373,46 @@ html {
 		max-inline-size: 100%;
 	}
 
+	section[data-screen="note"] {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: var(--space-sm);
+		min-block-size: 0;
+	}
+
+	section[data-screen="group"] {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+
+		input {
+			inline-size: 100%;
+			padding-block: 0.375rem;
+			padding-inline: var(--space-xs);
+			border: var(--border-ui);
+			border-radius: var(--radius-sm);
+			background: var(--color-bg);
+			font: var(--fw-regular) var(--fs-regular) var(--font-ui);
+			color: var(--color-text);
+
+			&:focus,
+			&:focus-visible {
+				outline: 0.125rem solid var(--color-focus);
+				outline-offset: 0.125rem;
+			}
+
+			&::placeholder {
+				color: var(--color-text-secondary);
+			}
+		}
+	}
+
+	section[hidden],
+	menu[hidden] {
+		display: none;
+	}
+
 	h2 {
 		margin: 0;
 		font-family: var(--font-ui);
@@ -390,7 +430,7 @@ html {
 		color: var(--color-text-secondary);
 	}
 
-	form > label {
+	section[data-screen="note"] > label {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xs);
@@ -572,7 +612,8 @@ html {
 			outline-offset: 0.125rem;
 		}
 
-		&[value="save"] {
+		&[value="save"],
+		&[data-action="confirm-group"] {
 			background: var(--color-primary);
 			color: var(--color-on-primary);
 
