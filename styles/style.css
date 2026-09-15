@@ -294,7 +294,7 @@ header {
 		}
 
 		menu {
-			display: none;
+			display: flex;
 			align-items: center;
 			gap: var(--space-sm);
 			margin: 0;
@@ -319,6 +319,10 @@ header {
 			transition: color var(--duration) var(--ease);
 
 			&:hover {
+				color: var(--color-text);
+			}
+
+			&[aria-pressed="true"] {
 				color: var(--color-text);
 			}
 

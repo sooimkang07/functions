@@ -207,11 +207,14 @@ const syncModalCopy = () => {
 	}
 }
 
-const fillGroupOptions = () => {
+const fillGroupOptions = async () => {
 	const list = modal?.querySelector('#notate-groups')
 	if (!list) return
 
-	list.innerHTML = notateUniqueGroups(annotations).map((group) => {
+	const stored = await getStoredAnnotations()
+	const all = Object.values(stored).flatMap((page) => page.annotations || [])
+
+	list.innerHTML = notateUniqueGroups(all).map((group) => {
 		return `<option value="${notateEscapeHtml(group)}"></option>`
 	}).join('')
 }
@@ -430,6 +433,11 @@ const createModal = () => {
 	modal.innerHTML = `
 		<form method="dialog">
 			<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
+			<label>
+				Group
+				<input name="annotation-group" list="notate-groups" placeholder="Across every page" autocomplete="off">
+			</label>
+			<datalist id="notate-groups"></datalist>
 			<menu>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>

@@ -184,10 +184,20 @@ const getSortedPages = (storedAnnotations) => {
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
 // each annotation is a clickable button with its selector saved in data-selector so I can scroll right to it
 // reversed so the most recently added annotation shows up at the top of the dropdown: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse
-const createAnnotationButton = (page, annotation) => {
+const createAnnotationButton = (page, annotation, showPage = false) => {
+	let pageLabel = page.title || page.url
+	try {
+		pageLabel = new URL(page.url).hostname.replace(/^www\./, '')
+	} catch {
+	}
+
+	const label = showPage
+		? `${escapeHtml(annotation.text)} · ${escapeHtml(pageLabel)}`
+		: escapeHtml(annotation.text)
+
 	return `
 		<li>
-			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(annotation.color))}">${escapeHtml(annotation.text)}</button>
+			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(annotation.color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
 		</li>
 	`
 }
@@ -231,6 +241,60 @@ const createPageItem = (page) => {
 			</ul>
 		</li>
 	`
+}
+
+const createGroupItem = (name, items, open = true) => {
+	const count = items.length
+	const annotationItems = items.map((item) => {
+		return createAnnotationButton(item.page, item, true)
+	}).join('')
+
+	return `
+		<li class="popup-page-item">
+			<section class="popup-page-row">
+				<button class="popup-page-button" type="button">
+					<span class="popup-page-title">${escapeHtml(name)}</span>
+				</button>
+				<button class="popup-page-toggle${open ? ' is-open' : ''}" type="button" aria-label="${count === 1 ? '1 note' : `${count} notes`}">
+					<span class="popup-page-count">${count}</span>
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7071 14.7071C12.3166 15.0976 11.6834 15.0976 11.2929 14.7071L6.29289 9.70711C5.90237 9.31658 5.90237 8.68342 6.29289 8.29289C6.68342 7.90237 7.31658 7.90237 7.70711 8.29289L12 12.5858L16.2929 8.29289C16.6834 7.90237 17.3166 7.90237 17.7071 8.29289C18.0976 8.68342 18.0976 9.31658 17.7071 9.70711L12.7071 14.7071Z" fill="currentColor"/></svg>				</button>
+			</section>
+			<ul class="popup-annotation-list"${open ? '' : ' hidden'}>
+				${annotationItems}
+			</ul>
+		</li>
+	`
+}
+
+const libraryViewKey = 'notate-library-view'
+
+const getLibraryView = async () => {
+	const stored = await extensionStorageGet(libraryViewKey)
+	return stored[libraryViewKey] === 'pages' ? 'pages' : 'groups'
+}
+
+const setLibraryView = async (view) => {
+	await extensionStorageSet({
+		[libraryViewKey]: view === 'pages' ? 'pages' : 'groups'
+	})
+}
+
+const syncLibraryViewButtons = (view) => {
+	const groupsButton = document.querySelector('[data-action="view-groups"]')
+	const pagesButton = document.querySelector('[data-action="view-pages"]')
+	if (groupsButton) groupsButton.setAttribute('aria-pressed', view === 'groups' ? 'true' : 'false')
+	if (pagesButton) pagesButton.setAttribute('aria-pressed', view === 'pages' ? 'true' : 'false')
+}
+
+const createGroupsLibrary = (storedAnnotations) => {
+	const notes = notateFlattenNotes(storedAnnotations)
+	const grouped = notateGroupedAnnotations(notes)
+	const hasNamed = grouped.some(([name]) => name !== NOTATE_UNGROUPED)
+
+	return grouped.map(([name, items]) => {
+		const open = name !== NOTATE_UNGROUPED || !hasNamed
+		return createGroupItem(name, items, open)
+	}).join('')
 }
 
 // fallback state if nothing has been saved yet
@@ -317,7 +381,13 @@ const activateOrOpenPage = async (url, selector = null) => {
 const bindPageButtons = () => {
 	list.querySelectorAll('.popup-page-button').forEach((button) => {
 		button.addEventListener('click', async () => {
-			await activateOrOpenPage(button.dataset.url)
+			if (button.dataset.url) {
+				await activateOrOpenPage(button.dataset.url)
+				return
+			}
+
+			const toggle = button.closest('.popup-page-item')?.querySelector('.popup-page-toggle')
+			toggle?.click()
 		})
 	})
 
@@ -345,16 +415,21 @@ const renderAnnotatedPages = async () => {
 	const pages = getSortedPages(storedAnnotations)
 	const tab = await getActiveTab()
 	const currentUrl = tab?.url || ''
+	const view = await getLibraryView()
+
+	syncLibraryViewButtons(view)
 
 	if (!pages.length) {
 		renderEmptyState()
 		return
 	}
 
-	list.innerHTML = pages.map((page) => createPageItem({
-		...page,
-		isCurrent: Boolean(currentUrl) && pageUrlsMatch(page.url, currentUrl)
-	})).join('')
+	list.innerHTML = view === 'pages'
+		? pages.map((page) => createPageItem({
+			...page,
+			isCurrent: Boolean(currentUrl) && pageUrlsMatch(page.url, currentUrl)
+		})).join('')
+		: createGroupsLibrary(storedAnnotations)
 	bindPageButtons()
 }
 
@@ -429,6 +504,15 @@ const initPopup = () => {
 	document.querySelector('[data-action="clear-all"]')?.addEventListener('click', clearAllAnnotations)
 	document.querySelector('[data-action="export"]')?.addEventListener('click', exportAllAnnotations)
 	document.querySelector('[data-action="dismiss-onboard"]')?.addEventListener('click', dismissOnboard)
+	document.querySelector('[data-action="view-groups"]')?.addEventListener('click', async () => {
+		await setLibraryView('groups')
+		renderAnnotatedPages()
+	})
+
+	document.querySelector('[data-action="view-pages"]')?.addEventListener('click', async () => {
+		await setLibraryView('pages')
+		renderAnnotatedPages()
+	})
 
 	initOnboard()
 	syncAddNoteAction().catch(() => {})
@@ -437,7 +521,7 @@ const initPopup = () => {
 	})
 
 	chrome.storage?.onChanged?.addListener((changes) => {
-		if (changes[storageKey]) renderAnnotatedPages()
+		if (changes[storageKey] || changes[libraryViewKey]) renderAnnotatedPages()
 	})
 
 	chrome.tabs?.onActivated?.addListener(() => {
