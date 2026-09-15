@@ -236,69 +236,92 @@ const syncModalCopy = () => {
 
 const readChosenGroup = () => {
 	const choice = form?.querySelector('[name="annotation-group-choice"]')?.value ?? ''
-	const typed = notateNormalizeGroup(form?.querySelector('[name="annotation-group"]')?.value ?? '')
-
-	if (choice === NOTATE_NEW_GROUP) return typed
+	if (choice === NOTATE_NEW_GROUP) {
+		return notateNormalizeGroup(form?.querySelector('[name="annotation-group"]')?.value ?? '')
+	}
 	return notateNormalizeGroup(choice)
 }
 
 const noteScreen = () => form?.querySelector('[data-screen="note"]')
+const pickScreen = () => form?.querySelector('[data-screen="pick"]')
 const groupScreen = () => form?.querySelector('[data-screen="group"]')
 const noteActions = () => form?.querySelector('[data-note-actions]')
+const pickActions = () => form?.querySelector('[data-pick-actions]')
 const groupActions = () => form?.querySelector('[data-group-actions]')
 
-const showNoteScreen = () => {
+const setModalScreen = (screen) => {
 	if (!form) return
+	form.dataset.screen = screen
+	if (noteScreen()) noteScreen().hidden = screen !== 'note'
+	if (pickScreen()) pickScreen().hidden = screen !== 'pick'
+	if (groupScreen()) groupScreen().hidden = screen !== 'group'
+	if (noteActions()) noteActions().hidden = screen !== 'note'
+	if (pickActions()) pickActions().hidden = screen !== 'pick'
+	if (groupActions()) groupActions().hidden = screen !== 'group'
+}
 
-	form.dataset.screen = 'note'
-	if (noteScreen()) noteScreen().hidden = false
-	if (groupScreen()) groupScreen().hidden = true
-	if (noteActions()) noteActions().hidden = false
-	if (groupActions()) groupActions().hidden = true
+const showNoteScreen = () => {
+	setModalScreen('note')
+	syncGroupChip()
+}
+
+const showPickScreen = () => {
+	setModalScreen('pick')
 }
 
 const showGroupScreen = () => {
-	if (!form) return
-
-	form.dataset.screen = 'group'
-	if (noteScreen()) noteScreen().hidden = true
-	if (groupScreen()) groupScreen().hidden = false
-	if (noteActions()) noteActions().hidden = true
-	if (groupActions()) groupActions().hidden = false
+	setModalScreen('group')
 	form.querySelector('[name="annotation-group"]')?.focus()
 }
 
+const syncGroupChip = async () => {
+	const chip = form?.querySelector('[data-group-chip]')
+	const add = form?.querySelector('.notate-add-group')
+	if (!chip) return
+
+	const name = readChosenGroup()
+	if (!name) {
+		chip.hidden = true
+		chip.textContent = ''
+		chip.removeAttribute('data-color')
+		if (add) add.hidden = false
+		return
+	}
+
+	const colors = await getGroupColors()
+	chip.hidden = false
+	chip.textContent = name
+	chip.dataset.color = notateResolveGroupColor(name, colors)
+	if (add) add.hidden = false
+}
+
+const setChosenGroup = (name) => {
+	const input = form?.querySelector('[name="annotation-group-choice"]')
+	const typed = form?.querySelector('[name="annotation-group"]')
+	if (input) input.value = notateNormalizeGroup(name)
+	if (typed && name !== NOTATE_NEW_GROUP) typed.value = notateNormalizeGroup(name)
+	syncGroupChip()
+}
+
 const confirmNewGroup = () => {
-	const select = form?.querySelector('[name="annotation-group-choice"]')
 	const nameInput = form?.querySelector('[name="annotation-group"]')
 	const name = notateNormalizeGroup(nameInput?.value ?? '')
-	if (!select || !nameInput) return false
 	if (!name) {
-		nameInput.focus()
+		nameInput?.focus()
 		return false
 	}
 
-	const exists = [...select.options].some((option) => option.value === name)
-	if (!exists) {
-		const option = document.createElement('option')
-		option.value = name
-		option.textContent = name
-		const noGroup = select.querySelector('option[value=""]')
-		if (noGroup) select.insertBefore(option, noGroup)
-		else select.append(option)
-	}
-
-	select.value = name
-	nameInput.value = name
+	setChosenGroup(name)
+	const color = notateNormalizeColor(form.querySelector('[name="annotation-color"]:checked')?.value)
+	if (modal) modal.dataset.color = color
 	showNoteScreen()
-	syncGroupColorFromName()
 	return true
 }
 
-const fillGroupOptions = async (preferred = '') => {
-	const select = form?.querySelector('[name="annotation-group-choice"]')
-	const nameInput = form?.querySelector('[name="annotation-group"]')
-	if (!select) return
+const fillGroupPickList = async (preferred = '') => {
+	const menu = form?.querySelector('[data-group-list]')
+	const choice = form?.querySelector('[name="annotation-group-choice"]')
+	if (!menu) return
 
 	const stored = await getStoredAnnotations()
 	const colors = await getGroupColors()
@@ -311,31 +334,20 @@ const fillGroupOptions = async (preferred = '') => {
 		savedOrder
 	)
 	const preferredName = notateNormalizeGroup(preferred)
-	const namedOptions = names.map((name) => {
-		return `<option value="${notateEscapeHtml(name)}">${notateEscapeHtml(name)}</option>`
-	})
 
-	select.innerHTML = [
-		`<option value="${NOTATE_NEW_GROUP}">+ New Group</option>`,
-		'<hr>',
-		...namedOptions,
-		namedOptions.length ? '<hr>' : '',
-		'<option value="">No group</option>'
-	].filter(Boolean).join('')
+	menu.innerHTML = [
+		'<li><button type="button" data-action="new-group">New group</button></li>',
+		...names.map((name) => {
+			const color = notateResolveGroupColor(name, colors)
+			return `<li><button type="button" data-action="choose-group" data-group="${notateEscapeHtml(name)}" data-color="${notateEscapeHtml(color)}">${notateEscapeHtml(name)}</button></li>`
+		}),
+		'<li><button type="button" data-action="clear-group">No group</button></li>'
+	].join('')
 
-	if (preferredName && names.includes(preferredName)) {
-		select.value = preferredName
-		if (nameInput) nameInput.value = preferredName
-		showNoteScreen()
-	} else if (preferredName) {
-		select.value = NOTATE_NEW_GROUP
-		if (nameInput) nameInput.value = preferredName
-		showGroupScreen()
-	} else {
-		select.value = ''
-		if (nameInput) nameInput.value = ''
-		showNoteScreen()
-	}
+	if (choice && preferredName) choice.value = preferredName
+	const nameInput = form.querySelector('[name="annotation-group"]')
+	if (nameInput && preferredName) nameInput.value = preferredName
+	syncGroupChip()
 }
 
 const getGroupColors = async () => {
@@ -404,7 +416,7 @@ const syncGroupColorFromName = async () => {
 
 const syncModalFields = async (annotation) => {
 	const preferredGroup = annotation?.group || pendingGroup || ''
-	await fillGroupOptions(preferredGroup)
+	await fillGroupPickList(preferredGroup)
 
 	const colors = await getGroupColors()
 	const groupName = readChosenGroup()
@@ -615,39 +627,43 @@ const createModal = () => {
 		<form method="dialog">
 			<section data-screen="note">
 				<textarea id="annotation-text" name="annotation-text" aria-label="New note" placeholder="New note"></textarea>
-				<label>
-					Group
-					<select name="annotation-group-choice" aria-label="Choose a group">
-						<option value="${NOTATE_NEW_GROUP}">+ New Group</option>
-						<hr>
-						<option value="">No group</option>
-					</select>
-				</label>
+				<footer class="notate-group-bar">
+					<button type="button" data-group-chip data-action="pick-group" hidden></button>
+					<button type="button" class="notate-add-group" data-action="pick-group">Add to group</button>
+				</footer>
+			</section>
+			<section data-screen="pick" hidden>
+				<menu data-group-list>
+					<li>
+						<button type="button" data-action="new-group">New group</button>
+					</li>
+				</menu>
 			</section>
 			<section data-screen="group" hidden>
 				<input name="annotation-group" placeholder="Group name" aria-label="Group name" autocomplete="off">
+				<fieldset>
+					<legend>Group color</legend>
+					<label data-color="yellow">
+						<input type="radio" name="annotation-color" value="yellow" aria-label="Yellow" checked>
+					</label>
+					<label data-color="mint">
+						<input type="radio" name="annotation-color" value="mint" aria-label="Mint">
+					</label>
+					<label data-color="sky">
+						<input type="radio" name="annotation-color" value="sky" aria-label="Sky">
+					</label>
+					<label data-color="peach">
+						<input type="radio" name="annotation-color" value="peach" aria-label="Peach">
+					</label>
+					<label data-color="lilac">
+						<input type="radio" name="annotation-color" value="lilac" aria-label="Lilac">
+					</label>
+					<label data-color="rose">
+						<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
+					</label>
+				</fieldset>
 			</section>
-			<fieldset>
-				<legend>Color</legend>
-				<label data-color="yellow">
-					<input type="radio" name="annotation-color" value="yellow" aria-label="Yellow" checked>
-				</label>
-				<label data-color="mint">
-					<input type="radio" name="annotation-color" value="mint" aria-label="Mint">
-				</label>
-				<label data-color="sky">
-					<input type="radio" name="annotation-color" value="sky" aria-label="Sky">
-				</label>
-				<label data-color="peach">
-					<input type="radio" name="annotation-color" value="peach" aria-label="Peach">
-				</label>
-				<label data-color="lilac">
-					<input type="radio" name="annotation-color" value="lilac" aria-label="Lilac">
-				</label>
-				<label data-color="rose">
-					<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
-				</label>
-			</fieldset>
+			<input type="hidden" name="annotation-group-choice" value="">
 			<menu data-note-actions>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
@@ -656,12 +672,17 @@ const createModal = () => {
 					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save</button>
 				</li>
 			</menu>
-			<menu data-group-actions hidden>
+			<menu data-pick-actions hidden>
 				<li>
 					<button type="button" data-action="back-note">Back</button>
 				</li>
+			</menu>
+			<menu data-group-actions hidden>
 				<li>
-					<button type="button" data-action="confirm-group">Continue</button>
+					<button type="button" data-action="back-pick">Back</button>
+				</li>
+				<li>
+					<button type="button" data-action="confirm-group">Save group</button>
 				</li>
 			</menu>
 		</form>
@@ -677,29 +698,48 @@ const createModal = () => {
 	textarea.addEventListener('input', () => {
 		scaleNoteType(textarea.value, textarea)
 	})
-	form.querySelector('[name="annotation-group-choice"]')?.addEventListener('change', () => {
-		const select = form.querySelector('[name="annotation-group-choice"]')
-		const nameInput = form.querySelector('[name="annotation-group"]')
-		if (select?.value === NOTATE_NEW_GROUP) {
+	form.addEventListener('click', (event) => {
+		const action = event.target.closest('[data-action]')?.dataset.action
+		if (!action) return
+
+		if (action === 'pick-group') {
+			fillGroupPickList(readChosenGroup()).then(showPickScreen)
+			return
+		}
+		if (action === 'new-group') {
+			const nameInput = form.querySelector('[name="annotation-group"]')
 			if (nameInput) nameInput.value = ''
 			showGroupScreen()
 			return
 		}
-		if (nameInput) nameInput.value = select?.value || ''
-		showNoteScreen()
-		syncGroupColorFromName()
+		if (action === 'choose-group') {
+			const name = event.target.closest('[data-action="choose-group"]')?.dataset.group || ''
+			setChosenGroup(name)
+			syncGroupColorFromName()
+			showNoteScreen()
+			return
+		}
+		if (action === 'clear-group') {
+			setChosenGroup('')
+			if (modal) modal.dataset.color = NOTATE_COLOR_DEFAULT
+			showNoteScreen()
+			return
+		}
+		if (action === 'back-note') {
+			showNoteScreen()
+			return
+		}
+		if (action === 'back-pick') {
+			showPickScreen()
+			return
+		}
+		if (action === 'confirm-group') {
+			confirmNewGroup()
+		}
 	})
 	form.querySelector('[name="annotation-group"]')?.addEventListener('keydown', (event) => {
 		if (event.key !== 'Enter') return
 		event.preventDefault()
-		confirmNewGroup()
-	})
-	form.querySelector('[data-action="back-note"]')?.addEventListener('click', () => {
-		const select = form.querySelector('[name="annotation-group-choice"]')
-		if (select) select.value = ''
-		showNoteScreen()
-	})
-	form.querySelector('[data-action="confirm-group"]')?.addEventListener('click', () => {
 		confirmNewGroup()
 	})
 	modal.addEventListener('change', (event) => {
@@ -759,7 +799,7 @@ const getAnnotationById = (id) => {
 // stacks notes on the same target by adding heights of annotations that come before this one in the saved array
 // using array order instead of DOM order avoids measuring the note itself or notes below it
 // HTMLElement.offsetHeight: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight
-const getNotePosition = (target, selector, annotationId) => {
+const getBaseNotePosition = (target, selector, annotationId) => {
 	const rem = remToPx()
 	const rect = target.getBoundingClientRect()
 	const gap = rem / 2
@@ -796,6 +836,19 @@ const getNotePosition = (target, selector, annotationId) => {
 		})
 	}
 
+	return { top, left }
+}
+
+const getNotePosition = (target, selector, annotationId) => {
+	const rem = remToPx()
+	const gap = rem / 2
+	const noteWidth = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-note')) || 18)
+	const viewportLeft = window.scrollX
+	const viewportRight = window.scrollX + window.innerWidth
+	const base = getBaseNotePosition(target, selector, annotationId)
+	let left = base.left
+	let top = base.top
+
 	const annotation = getAnnotationById(annotationId)
 	left += annotation?.offsetInline || 0
 	top += annotation?.offsetBlock || 0
@@ -809,6 +862,53 @@ const getNotePosition = (target, selector, annotationId) => {
 	}
 
 	return { top, left }
+}
+
+const snapNoteToTargetBorder = (annotation, noteEl, clientX, clientY) => {
+	const target = document.querySelector(annotation.selector)
+	if (!target || !noteEl) return
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = target.getBoundingClientRect()
+	const noteWidth = noteEl.offsetWidth || rem * 8
+	const noteHeight = noteEl.offsetHeight || rem * 3
+	const distRight = Math.abs(clientX - rect.right)
+	const distLeft = Math.abs(clientX - rect.left)
+	const distTop = Math.abs(clientY - rect.top)
+	const distBottom = Math.abs(clientY - rect.bottom)
+	const nearest = Math.min(distRight, distLeft, distTop, distBottom)
+
+	let left
+	let top
+	if (nearest === distRight) {
+		left = rect.right + window.scrollX + gap
+		top = clientY + window.scrollY - noteHeight / 2
+		top = Math.min(Math.max(top, rect.top + window.scrollY), rect.bottom + window.scrollY - Math.min(noteHeight, rect.height || noteHeight))
+	} else if (nearest === distLeft) {
+		left = rect.left + window.scrollX - noteWidth - gap
+		top = clientY + window.scrollY - noteHeight / 2
+		top = Math.min(Math.max(top, rect.top + window.scrollY), rect.bottom + window.scrollY - Math.min(noteHeight, rect.height || noteHeight))
+	} else if (nearest === distTop) {
+		top = rect.top + window.scrollY - noteHeight - gap
+		left = clientX + window.scrollX - noteWidth / 2
+		left = Math.min(Math.max(left, rect.left + window.scrollX), rect.right + window.scrollX - Math.min(noteWidth, rect.width || noteWidth))
+	} else {
+		top = rect.bottom + window.scrollY + gap
+		left = clientX + window.scrollX - noteWidth / 2
+		left = Math.min(Math.max(left, rect.left + window.scrollX), rect.right + window.scrollX - Math.min(noteWidth, rect.width || noteWidth))
+	}
+
+	const minLeft = window.scrollX + gap
+	const minTop = window.scrollY + gap
+	const maxLeft = window.scrollX + window.innerWidth - noteWidth - gap
+	const maxTop = window.scrollY + window.innerHeight - noteHeight - gap
+	left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft))
+	top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop))
+
+	const base = getBaseNotePosition(target, annotation.selector, annotation.id)
+	annotation.offsetInline = Math.round(left - base.left)
+	annotation.offsetBlock = Math.round(top - base.top)
 }
 
 // outline the targeted element
@@ -1112,9 +1212,7 @@ const onModalSubmit = async (event) => {
 		return
 	}
 
-	const choice = form?.querySelector('[name="annotation-group-choice"]')?.value
-	if (choice === NOTATE_NEW_GROUP) {
-		showGroupScreen()
+	if (form?.dataset.screen === 'pick') {
 		return
 	}
 
@@ -1366,7 +1464,7 @@ document.addEventListener('keyup', (event) => {
 	if (event.key === 'Alt' && isPreviewing) clearHoverFill()
 })
 document.addEventListener('pointerdown', (event) => {
-	if ((!isMoving && !isAnnotating) || event.button !== 0) return
+	if ((!isMoving && !isAnnotating && !isPreviewing) || event.button !== 0) return
 	if (event.target.closest('.notate-delete')) return
 
 	const note = event.target.closest('.notate-note')
@@ -1400,8 +1498,13 @@ document.addEventListener('pointermove', (event) => {
 	const annotation = getAnnotationById(noteDrag.id)
 	if (!annotation) return
 
-	annotation.offsetInline = Math.round(noteDrag.originInline + deltaX)
-	annotation.offsetBlock = Math.round(noteDrag.originBlock + deltaY)
+	const noteEl = layer?.querySelector(`.notate-note[data-id="${annotation.id}"]`)
+	if (noteDrag.moved && noteEl) {
+		snapNoteToTargetBorder(annotation, noteEl, event.clientX, event.clientY)
+	} else {
+		annotation.offsetInline = Math.round(noteDrag.originInline + deltaX)
+		annotation.offsetBlock = Math.round(noteDrag.originBlock + deltaY)
+	}
 	repositionAnnotations()
 }, true)
 

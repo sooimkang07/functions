@@ -37,6 +37,7 @@
 			<section class="popup-section">
 				<header>
 					<h2 class="popup-section-title">Notes</h2>
+					<button type="button" data-action="clear-all">Clear all</button>
 				</header>
 				<nav class="popup-group-tabs" aria-label="Groups" hidden>
 					<menu id="group-tabs"></menu>
@@ -61,6 +62,32 @@
 				<button type="button" data-action="delete-group">Delete</button>
 			</li>
 		</menu>
+
+		<menu id="note-item-menu" hidden>
+			<li>
+				<button type="button" data-action="delete-note">Delete</button>
+			</li>
+		</menu>
+
+		<menu id="page-item-menu" hidden>
+			<li>
+				<button type="button" data-action="clear-page">Clear page</button>
+			</li>
+		</menu>
+
+		<dialog id="confirm-dialog">
+			<form method="dialog">
+				<p id="confirm-message"></p>
+				<menu>
+					<li>
+						<button type="submit" value="cancel">Cancel</button>
+					</li>
+					<li>
+						<button type="submit" value="confirm">Clear</button>
+					</li>
+				</menu>
+			</form>
+		</dialog>
 
 		<dialog id="group-edit-dialog">
 			<form method="dialog">

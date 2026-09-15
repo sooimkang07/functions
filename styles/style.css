@@ -407,6 +407,11 @@ header {
 		&.is-drop-after {
 			box-shadow: inset -0.125rem 0 0 var(--color-focus);
 		}
+
+		&.is-note-drop button {
+			color: var(--color-text);
+			background: var(--note-bg, var(--color-hover));
+		}
 	}
 
 	button {
@@ -483,7 +488,9 @@ header {
 	}
 }
 
-#group-tab-menu {
+#group-tab-menu,
+#note-item-menu,
+#page-item-menu {
 	position: fixed;
 	z-index: 20;
 	min-inline-size: 8rem;
@@ -525,7 +532,9 @@ header {
 		}
 	}
 
-	[data-action="delete-group"] {
+	[data-action="delete-group"],
+	[data-action="delete-note"],
+	[data-action="clear-page"] {
 		color: var(--color-clear);
 
 		&:hover,
@@ -536,7 +545,8 @@ header {
 	}
 }
 
-#group-edit-dialog {
+#group-edit-dialog,
+#confirm-dialog {
 	margin: auto;
 	inline-size: min(18rem, calc(100% - var(--space-xl)));
 	max-inline-size: calc(100% - var(--space-lg));
@@ -561,6 +571,13 @@ header {
 		gap: var(--space-sm);
 		min-inline-size: 0;
 		max-inline-size: 100%;
+	}
+
+	p {
+		margin: 0;
+		font-size: var(--fs-regular);
+		line-height: 1.4;
+		color: var(--color-text);
 	}
 
 	input[name="group-name"] {
@@ -835,6 +852,16 @@ header {
 		color: var(--color-text-tertiary);
 	}
 
+	h3[data-color] {
+		display: inline-flex;
+		margin-inline: var(--space-lg);
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-xs);
+		border-radius: var(--radius-pill);
+		background: var(--note-bg, var(--color-note));
+		color: var(--color-text);
+	}
+
 	ul {
 		margin: 0;
 		padding: 0;
@@ -865,6 +892,7 @@ header {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	touch-action: none;
 	transition:
 		background-color var(--duration) var(--ease),
 		color var(--duration) var(--ease);
@@ -886,6 +914,12 @@ header {
 	&:focus-visible {
 		outline: 0.125rem solid var(--color-focus);
 		outline-offset: -0.125rem;
+	}
+
+	&.is-dragging {
+		opacity: 0.55;
+		cursor: grabbing;
+		background: var(--color-hover);
 	}
 }
 

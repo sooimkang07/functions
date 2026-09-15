@@ -201,26 +201,30 @@ const createAnnotationButton = (page, annotation, showPage = false, color = anno
 
 	return `
 		<li>
-			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
+			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-id="${escapeHtml(annotation.id || '')}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
 		</li>
 	`
 }
 
-const createPageItem = (page) => {
+const createPageItem = (page, colors = {}) => {
 	const notes = page.annotations || []
 	const count = notes.length
 	const origin = new URL(page.url).origin
 	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=32`
 	const annotations = [...notes].map(notateNormalizeAnnotation).reverse()
 	const grouped = notateGroupedAnnotations(annotations)
-	const showGroupHeadings = grouped.some(([name]) => name !== NOTATE_UNGROUPED)
 	const annotationItems = grouped.map(([name, items]) => {
-		const buttons = items.map((annotation) => createAnnotationButton(page, annotation)).join('')
-		if (!showGroupHeadings) return buttons
+		const buttons = items.map((annotation) => {
+			const color = notateResolveGroupColor(annotation.group, colors, annotation.color)
+			return createAnnotationButton(page, annotation, false, color)
+		}).join('')
+		if (name === NOTATE_UNGROUPED) return buttons
+
+		const color = notateResolveGroupColor(name, colors)
 
 		return `
 			<li>
-				<h3>${escapeHtml(name)}</h3>
+				<h3 data-color="${escapeHtml(color)}">${escapeHtml(name)}</h3>
 				<ul>
 					${buttons}
 				</ul>
@@ -304,15 +308,34 @@ const createGroupsLibrary = (storedAnnotations) => {
 	}).join('')
 }
 
+const libraryGroupsKey = 'notate-library-groups'
+
+const getSelectedGroups = async () => {
+	const stored = await extensionStorageGet([libraryGroupsKey, libraryGroupKey])
+	if (Array.isArray(stored[libraryGroupsKey])) {
+		return stored[libraryGroupsKey].map((name) => notateNormalizeGroup(name)).filter(Boolean)
+	}
+
+	const legacy = notateNormalizeGroup(stored[libraryGroupKey] || '')
+	return legacy ? [legacy] : []
+}
+
+const setSelectedGroups = async (groups) => {
+	const next = [...new Set((groups || []).map((name) => notateNormalizeGroup(name)).filter(Boolean))]
+	await extensionStorageSet({
+		[libraryGroupsKey]: next,
+		[libraryGroupKey]: next[0] || ''
+	})
+}
+
 const getLibraryGroup = async () => {
-	const stored = await extensionStorageGet(libraryGroupKey)
-	return String(stored[libraryGroupKey] || '')
+	const selected = await getSelectedGroups()
+	return selected.length === 1 ? selected[0] : ''
 }
 
 const setLibraryGroup = async (group) => {
-	await extensionStorageSet({
-		[libraryGroupKey]: String(group || '')
-	})
+	const name = notateNormalizeGroup(group)
+	await setSelectedGroups(name ? [name] : [])
 }
 
 const getGroupColors = async () => {
@@ -341,18 +364,68 @@ const hideGroupTabMenu = () => {
 	menu.dataset.group = ''
 }
 
-const placeGroupTabMenu = (event, name) => {
-	const menu = document.querySelector('#group-tab-menu')
+const hideNoteItemMenu = () => {
+	const menu = document.querySelector('#note-item-menu')
 	if (!menu) return
+	menu.hidden = true
+	menu.dataset.url = ''
+	menu.dataset.id = ''
+}
 
+const hidePageItemMenu = () => {
+	const menu = document.querySelector('#page-item-menu')
+	if (!menu) return
+	menu.hidden = true
+	menu.dataset.url = ''
+	menu.dataset.count = ''
+}
+
+const hideLibraryMenus = () => {
+	hideGroupTabMenu()
+	hideNoteItemMenu()
+	hidePageItemMenu()
+}
+
+const placeFixedMenu = (menu, event) => {
+	if (!menu) return
 	menu.hidden = false
-	menu.dataset.group = name
 	const menuWidth = menu.offsetWidth
 	const menuHeight = menu.offsetHeight
 	const inline = Math.min(event.clientX, window.innerWidth - menuWidth - 8)
 	const block = Math.min(event.clientY, window.innerHeight - menuHeight - 8)
 	menu.style.insetInlineStart = `${Math.max(8, inline)}px`
 	menu.style.insetBlockStart = `${Math.max(8, block)}px`
+}
+
+const askConfirm = (message, confirmLabel = 'Clear') => {
+	const dialog = document.querySelector('#confirm-dialog')
+	const text = dialog?.querySelector('#confirm-message')
+	const confirmButton = dialog?.querySelector('[value="confirm"]')
+	if (!dialog || !text) {
+		return Promise.resolve(window.confirm(message))
+	}
+
+	text.textContent = message
+	if (confirmButton) confirmButton.textContent = confirmLabel
+	dialog.returnValue = 'cancel'
+	dialog.showModal()
+
+	return new Promise((resolve) => {
+		const onClose = () => {
+			dialog.removeEventListener('close', onClose)
+			resolve(dialog.returnValue === 'confirm')
+		}
+		dialog.addEventListener('close', onClose)
+	})
+}
+
+const placeGroupTabMenu = (event, name) => {
+	const menu = document.querySelector('#group-tab-menu')
+	if (!menu) return
+
+	hideLibraryMenus()
+	menu.dataset.group = name
+	placeFixedMenu(menu, event)
 }
 
 const openGroupEditor = async (name, focusColor = false) => {
@@ -367,7 +440,7 @@ const openGroupEditor = async (name, focusColor = false) => {
 	form.querySelectorAll('[name="group-color"]').forEach((radio) => {
 		radio.checked = radio.value === color
 	})
-	hideGroupTabMenu()
+	hideLibraryMenus()
 	dialog.returnValue = 'cancel'
 	dialog.showModal()
 	if (focusColor) {
@@ -409,8 +482,10 @@ const saveGroupEdits = async (from, to, color) => {
 		[groupOrderKey]: renamed.order
 	})
 
-	const selected = await getLibraryGroup()
-	if (selected === from) await setLibraryGroup(renamed.selected)
+	const selected = await getSelectedGroups()
+	if (selected.includes(from)) {
+		await setSelectedGroups(selected.map((name) => (name === from ? renamed.selected : name)))
+	}
 	renderAnnotatedPages()
 }
 
@@ -429,9 +504,9 @@ const deleteNamedGroup = async (name) => {
 		[groupOrderKey]: next.order
 	})
 
-	const selected = await getLibraryGroup()
-	if (selected === key) await setLibraryGroup('')
-	hideGroupTabMenu()
+	const selected = await getSelectedGroups()
+	if (selected.includes(key)) await setSelectedGroups(selected.filter((name) => name !== key))
+	hideLibraryMenus()
 	renderAnnotatedPages()
 }
 
@@ -458,12 +533,6 @@ const bindGroupTabMenu = () => {
 		}
 	})
 
-	document.addEventListener('pointerdown', (event) => {
-		if (menu.hidden) return
-		if (event.target.closest('#group-tab-menu')) return
-		hideGroupTabMenu()
-	})
-
 	const dialog = document.querySelector('#group-edit-dialog')
 	dialog?.querySelector('form')?.addEventListener('submit', (event) => {
 		if (event.submitter?.value !== 'save') return
@@ -477,7 +546,7 @@ const bindGroupTabMenu = () => {
 const hideGroupTabs = () => {
 	const nav = document.querySelector('.popup-group-tabs')
 	if (nav) nav.hidden = true
-	hideGroupTabMenu()
+	hideLibraryMenus()
 }
 
 const clearGroupTabDropState = (menu) => {
@@ -608,7 +677,7 @@ const bindGroupTabDrag = (menu, names) => {
 	}, true)
 }
 
-const renderGroupTabs = (grouped, selected, colors, order = []) => {
+const renderGroupTabs = (grouped, selectedGroups, colors, order = []) => {
 	const nav = document.querySelector('.popup-group-tabs')
 	const menu = document.querySelector('#group-tabs')
 	if (!nav || !menu) return
@@ -617,6 +686,12 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 		.map(([name]) => name)
 		.filter((name) => name && name !== NOTATE_UNGROUPED)
 	const ordered = notateOrderGroupNames(named, order)
+	if (!ordered.length) {
+		hideGroupTabs()
+		return
+	}
+
+	const selected = new Set((selectedGroups || []).filter(Boolean))
 	const tabs = [['', 'All'], ...ordered.map((name) => [name, name])]
 	const scroll = nav.scrollLeft
 
@@ -625,25 +700,36 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 			? notateResolveGroupColor(value, colors)
 			: ''
 		const colorAttr = color ? ` data-color="${escapeHtml(color)}"` : ''
-		const isSelected = value === selected
+		const isSelected = value ? selected.has(value) : selected.size === 0
 
 		return `
 			<li data-group="${escapeHtml(value)}">
-				<button type="button" draggable="false" data-action="view-group" data-group="${escapeHtml(value)}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
+				<button type="button" draggable="false" data-action="view-group" data-group="${escapeHtml(value)}" aria-pressed="${isSelected ? 'true' : 'false'}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
 			</li>
 		`
 	}).join('')
 
 	nav.hidden = false
 	nav.scrollLeft = scroll
-	menu.querySelector('[data-action="view-group"][aria-selected="true"]')?.scrollIntoView({
+	menu.querySelector('[data-action="view-group"][aria-pressed="true"]')?.scrollIntoView({
 		inline: 'nearest',
 		block: 'nearest'
 	})
 
 	menu.querySelectorAll('[data-action="view-group"]').forEach((button) => {
 		button.addEventListener('click', async () => {
-			await setLibraryGroup(button.dataset.group || '')
+			const name = notateNormalizeGroup(button.dataset.group || '')
+			if (!name) {
+				await setSelectedGroups([])
+				renderAnnotatedPages()
+				return
+			}
+
+			const current = await getSelectedGroups()
+			const next = current.includes(name)
+				? current.filter((item) => item !== name)
+				: [...current, name]
+			await setSelectedGroups(next)
 			renderAnnotatedPages()
 		})
 	})
@@ -741,10 +827,160 @@ const activateOrOpenPage = async (url, selector = null) => {
 	}
 }
 
+const placeNoteItemMenu = (event, url, id) => {
+	const menu = document.querySelector('#note-item-menu')
+	if (!menu) return
+	hideLibraryMenus()
+	menu.dataset.url = url
+	menu.dataset.id = id
+	placeFixedMenu(menu, event)
+}
+
+const placePageItemMenu = (event, url, count) => {
+	const menu = document.querySelector('#page-item-menu')
+	if (!menu) return
+	hideLibraryMenus()
+	menu.dataset.url = url
+	menu.dataset.count = String(count)
+	placeFixedMenu(menu, event)
+}
+
+const deleteStoredNote = async (url, id) => {
+	if (!id) return
+	const ok = await askConfirm('Delete this note?', 'Delete')
+	if (!ok) return
+
+	const stored = await getStoredAnnotations()
+	Object.entries(stored).forEach(([key, page]) => {
+		if (url && page.url !== url) return
+		page.annotations = (page.annotations || []).filter((annotation) => annotation.id !== id)
+		if (!page.annotations.length) delete stored[key]
+	})
+	await extensionStorageSet({ [storageKey]: stored })
+	hideLibraryMenus()
+	renderAnnotatedPages()
+}
+
+const clearStoredPage = async (url, count) => {
+	if (!url) return
+	const label = count === 1 ? '1 annotation' : `${count} annotations`
+	const ok = await askConfirm(`Clear all ${label} on this webpage? This cannot be undone.`, 'Clear')
+	if (!ok) return
+
+	const stored = await getStoredAnnotations()
+	Object.entries(stored).forEach(([key, page]) => {
+		if (page.url === url) delete stored[key]
+	})
+	await extensionStorageSet({ [storageKey]: stored })
+	hideLibraryMenus()
+	renderAnnotatedPages()
+}
+
+const bindLibraryMenus = () => {
+	const noteMenu = document.querySelector('#note-item-menu')
+	if (noteMenu && !noteMenu.dataset.bound) {
+		noteMenu.dataset.bound = 'true'
+		noteMenu.addEventListener('click', async (event) => {
+			if (!event.target.closest('[data-action="delete-note"]')) return
+			await deleteStoredNote(noteMenu.dataset.url, noteMenu.dataset.id)
+		})
+	}
+
+	const pageMenu = document.querySelector('#page-item-menu')
+	if (pageMenu && !pageMenu.dataset.bound) {
+		pageMenu.dataset.bound = 'true'
+		pageMenu.addEventListener('click', async (event) => {
+			if (!event.target.closest('[data-action="clear-page"]')) return
+			await clearStoredPage(pageMenu.dataset.url, Number(pageMenu.dataset.count) || 0)
+		})
+	}
+
+	if (document.documentElement.dataset.notateMenuHide !== 'true') {
+		document.documentElement.dataset.notateMenuHide = 'true'
+		document.addEventListener('pointerdown', (event) => {
+			if (event.target.closest('#group-tab-menu, #note-item-menu, #page-item-menu')) return
+			hideLibraryMenus()
+		})
+	}
+}
+
+const bindNoteGroupDrop = (allowDrop) => {
+	if (!list || !allowDrop) return
+
+	list.querySelectorAll('.popup-annotation-item').forEach((button) => {
+		let drag = null
+
+		button.addEventListener('pointerdown', (event) => {
+			if (event.button !== 0) return
+			drag = {
+				id: button.dataset.id || '',
+				url: button.dataset.url || '',
+				startX: event.clientX,
+				startY: event.clientY,
+				moved: false,
+				pointerId: event.pointerId
+			}
+			button.setPointerCapture(event.pointerId)
+		})
+
+		button.addEventListener('pointermove', (event) => {
+			if (!drag || event.pointerId !== drag.pointerId) return
+			if (Math.abs(event.clientX - drag.startX) > 4 || Math.abs(event.clientY - drag.startY) > 4) {
+				drag.moved = true
+				button.classList.add('is-dragging')
+			}
+			if (!drag.moved) return
+
+			document.querySelectorAll('#group-tabs li[data-group]').forEach((item) => {
+				const name = item.dataset.group || ''
+				if (!name) {
+					item.classList.remove('is-note-drop')
+					return
+				}
+				const rect = item.getBoundingClientRect()
+				const over = event.clientX >= rect.left && event.clientX <= rect.right
+					&& event.clientY >= rect.top && event.clientY <= rect.bottom
+				item.classList.toggle('is-note-drop', over)
+			})
+		})
+
+		const finish = async (event) => {
+			if (!drag || event.pointerId !== drag.pointerId) return
+			const moved = drag.moved
+			const id = drag.id
+			const url = drag.url
+			drag = null
+			button.classList.remove('is-dragging')
+			const drop = document.querySelector('#group-tabs li.is-note-drop')
+			document.querySelectorAll('#group-tabs li.is-note-drop').forEach((item) => {
+				item.classList.remove('is-note-drop')
+			})
+			if (moved) button.dataset.dragged = 'true'
+			if (!moved || !id || !drop?.dataset.group) return
+
+			const colors = await getGroupColors()
+			const stored = await getStoredAnnotations()
+			const next = notateAssignNoteGroup(stored, colors, url, id, drop.dataset.group)
+			if (!next.found) return
+			await extensionStorageSet({ [storageKey]: next.stored })
+			renderAnnotatedPages()
+		}
+
+		button.addEventListener('pointerup', finish)
+		button.addEventListener('pointercancel', finish)
+		button.addEventListener('click', (event) => {
+			if (button.dataset.dragged !== 'true') return
+			event.preventDefault()
+			event.stopImmediatePropagation()
+			delete button.dataset.dragged
+		}, true)
+	})
+}
+
 // link each annotated page button
 // Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
 // page button navigates to the page, arrow toggles the dropdown, annotation items jump to that specific one
-const bindPageButtons = () => {
+const bindPageButtons = (allowGroupDrop = false) => {
 	list.querySelectorAll('.popup-page-button').forEach((button) => {
 		button.addEventListener('click', async () => {
 			if (button.dataset.url) {
@@ -754,6 +990,19 @@ const bindPageButtons = () => {
 
 			const toggle = button.closest('.popup-page-item')?.querySelector('.popup-page-toggle')
 			toggle?.click()
+		})
+	})
+
+	list.querySelectorAll('.popup-page-item').forEach((item) => {
+		const pageButton = item.querySelector('.popup-page-button')
+		const toggle = item.querySelector('.popup-page-toggle')
+		const url = pageButton?.dataset.url || ''
+		const count = Number(toggle?.querySelector('.popup-page-count')?.textContent) || 0
+		item.addEventListener('contextmenu', (event) => {
+			if (event.target.closest('.popup-annotation-item')) return
+			if (!url) return
+			event.preventDefault()
+			placePageItemMenu(event, url, count)
 		})
 	})
 
@@ -770,7 +1019,14 @@ const bindPageButtons = () => {
 		button.addEventListener('click', async () => {
 			await activateOrOpenPage(button.dataset.url, button.dataset.selector)
 		})
+		button.addEventListener('contextmenu', (event) => {
+			event.preventDefault()
+			placeNoteItemMenu(event, button.dataset.url || '', button.dataset.id || '')
+		})
 	})
+
+	bindLibraryMenus()
+	bindNoteGroupDrop(allowGroupDrop)
 }
 
 // render annotated pages
@@ -787,11 +1043,10 @@ const renderAnnotatedPages = async () => {
 			.filter((name) => name !== NOTATE_UNGROUPED)
 	)
 	const colors = notateResolveGroupColors(grouped, await getGroupColors())
-	let selected = await getLibraryGroup()
+	let selectedGroups = (await getSelectedGroups()).filter((name) => groupNames.has(name))
 
-	if (selected && !groupNames.has(selected)) {
-		selected = ''
-		await setLibraryGroup('')
+	if (selectedGroups.length !== (await getSelectedGroups()).length) {
+		await setSelectedGroups(selectedGroups)
 	}
 
 	if (!pages.length) {
@@ -799,27 +1054,29 @@ const renderAnnotatedPages = async () => {
 		return
 	}
 
-	renderGroupTabs(grouped, selected, colors, await getGroupOrder())
+	renderGroupTabs(grouped, selectedGroups, colors, await getGroupOrder())
 
-	const visible = selected
-		? notes.filter((note) => notateGroupKey(note.group) === selected)
-		: notes
+	const visiblePages = pages.map((page) => {
+		const annotations = (page.annotations || []).filter((annotation) => {
+			if (!selectedGroups.length) return true
+			return selectedGroups.includes(notateNormalizeGroup(annotation.group))
+		})
+		if (!annotations.length) return null
+		return { ...page, annotations }
+	}).filter(Boolean)
 
-	if (!visible.length) {
+	if (!visiblePages.length) {
 		list.innerHTML = `
 			<li class="popup-empty-state">
 				<h2>No notes in this group</h2>
-				<p>Switch tabs, or add a note to this group.</p>
+				<p>Select another group, or add a note to this group.</p>
 			</li>
 		`
 		return
 	}
 
-	list.innerHTML = visible.map((item) => {
-		const color = notateResolveGroupColor(item.group, colors, item.color)
-		return createAnnotationButton(item.page, item, true, color)
-	}).join('')
-	bindPageButtons()
+	list.innerHTML = visiblePages.map((page) => createPageItem(page, colors)).join('')
+	bindPageButtons(!selectedGroups.length)
 }
 
 // popup starts annotation mode on the current tab, then closes
@@ -853,7 +1110,8 @@ const exportAllAnnotations = async () => {
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
-	if (!window.confirm('Clear every note? This cannot be undone.')) return
+	const ok = await askConfirm('Clear every note across all pages? This cannot be undone.', 'Clear all')
+	if (!ok) return
 
 	await extensionStorageRemove(storageKey)
 	renderAnnotatedPages()
@@ -910,7 +1168,7 @@ const initPopup = () => {
 	})
 
 	chrome.storage?.onChanged?.addListener((changes) => {
-		if (changes[storageKey] || changes[libraryViewKey] || changes[libraryGroupKey] || changes[groupColorsKey] || changes[groupOrderKey]) {
+		if (changes[storageKey] || changes[libraryViewKey] || changes[libraryGroupKey] || changes[libraryGroupsKey] || changes[groupColorsKey] || changes[groupOrderKey]) {
 			renderAnnotatedPages()
 		}
 	})

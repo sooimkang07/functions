@@ -283,6 +283,26 @@
 		return { stored, colors: nextColors }
 	}
 
+	globalThis.notateAssignNoteGroup = (stored = {}, colors = {}, pageUrl, annotationId, group) => {
+		const name = globalThis.notateNormalizeGroup(group)
+		const nextColor = name
+			? globalThis.notateResolveGroupColor(name, colors)
+			: globalThis.NOTATE_COLOR_DEFAULT
+		let found = false
+
+		Object.values(stored).forEach((page) => {
+			;(page.annotations || []).forEach((annotation) => {
+				if (annotation.id !== annotationId) return
+				if (pageUrl && page.url !== pageUrl) return
+				annotation.group = name
+				if (name) annotation.color = nextColor
+				found = true
+			})
+		})
+
+		return { stored, found, group: name, color: nextColor }
+	}
+
 	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
 		return Object.values(storedAnnotations)
 			.flatMap((page) => {

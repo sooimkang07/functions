@@ -375,6 +375,125 @@ html {
 		max-inline-size: 100%;
 	}
 
+	section[data-screen="pick"] {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
+		min-block-size: 0;
+		overflow: auto;
+
+		menu {
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0;
+			max-inline-size: 100%;
+
+			li {
+				list-style: none;
+			}
+
+			button {
+				display: flex;
+				inline-size: 100%;
+				padding-block: var(--space-xs);
+				padding-inline: var(--space-sm);
+				border: none;
+				border-radius: var(--radius-sm);
+				background: transparent;
+				color: var(--color-text);
+				cursor: pointer;
+				font: var(--fw-regular) var(--fs-regular) var(--font-ui);
+				text-align: start;
+
+				&[data-color] {
+					background: transparent;
+				}
+
+				&:hover,
+				&:focus-visible {
+					background: var(--color-hover);
+					outline: none;
+				}
+			}
+
+			[data-action="new-group"] {
+				font-weight: var(--fw-medium);
+				color: var(--color-focus);
+			}
+		}
+	}
+
+	.notate-group-bar {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+		margin-block-start: auto;
+
+		[data-group-chip] {
+			display: inline-flex;
+			align-items: center;
+			max-inline-size: 70%;
+			padding-block: var(--space-2xs);
+			padding-inline: var(--space-sm);
+			border: none;
+			border-radius: var(--radius-pill);
+			background: var(--note-bg, var(--color-note));
+			color: var(--color-text);
+			cursor: pointer;
+			font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+
+			&[hidden] {
+				display: none;
+			}
+		}
+	}
+
+	.notate-add-group {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xs);
+		padding-block: var(--space-2xs);
+		padding-inline: 0;
+		border: none;
+		background: transparent;
+		color: var(--color-text);
+		cursor: pointer;
+		font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+
+		&::before {
+			content: "+";
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			inline-size: 1.5rem;
+			block-size: 1.5rem;
+			border: 0.125rem solid var(--color-focus);
+			border-radius: var(--radius-pill);
+			color: var(--color-focus);
+			font: var(--fw-medium) var(--fs-regular) var(--font-ui);
+		}
+
+		&:hover,
+		&:focus-visible {
+			color: var(--color-focus);
+			outline: none;
+		}
+	}
+
+	.notate-group-bar:has([data-group-chip]:not([hidden])) .notate-add-group {
+		font-size: 0;
+		gap: 0;
+	}
+
+	.notate-group-bar:has([data-group-chip]:not([hidden])) .notate-add-group::before {
+		font-size: var(--fs-regular);
+	}
+
 	section[data-screen="note"] {
 		display: flex;
 		flex: 1;
