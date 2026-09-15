@@ -329,7 +329,12 @@ const renderGroupTabs = (grouped, selected, colors) => {
 	const menu = document.querySelector('#group-tabs')
 	if (!nav || !menu) return
 
-	const tabs = [['', 'All'], ...grouped.map(([name]) => [name, name])]
+	const tabs = [
+		['', 'All'],
+		...grouped
+			.filter(([name]) => name !== NOTATE_UNGROUPED)
+			.map(([name]) => [name, name])
+	]
 	const scroll = nav.scrollLeft
 
 	menu.innerHTML = tabs.map(([value, label]) => {
@@ -480,7 +485,11 @@ const renderAnnotatedPages = async () => {
 	const pages = getSortedPages(storedAnnotations)
 	const notes = notateFlattenNotes(storedAnnotations)
 	const grouped = notateGroupedAnnotations(notes)
-	const groupNames = new Set(grouped.map(([name]) => name))
+	const groupNames = new Set(
+		grouped
+			.map(([name]) => name)
+			.filter((name) => name !== NOTATE_UNGROUPED)
+	)
 	const colors = notateResolveGroupColors(grouped, await getGroupColors())
 	let selected = await getLibraryGroup()
 
