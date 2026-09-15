@@ -110,6 +110,20 @@
 		)].sort((left, right) => left.localeCompare(right))
 	}
 
+	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
+		return Object.values(storedAnnotations)
+			.sort((pageA, pageB) => (pageB.updatedAt || 0) - (pageA.updatedAt || 0))
+			.flatMap((page) => {
+				return [...(page.annotations || [])]
+					.map(globalThis.notateNormalizeAnnotation)
+					.reverse()
+					.map((annotation) => ({
+						...annotation,
+						page
+					}))
+			})
+	}
+
 	globalThis.notateExportPayload = (storedAnnotations = {}) => {
 		const pages = Object.values(storedAnnotations).sort((pageA, pageB) => {
 			return (pageB.updatedAt || 0) - (pageA.updatedAt || 0)
