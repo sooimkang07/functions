@@ -6,13 +6,15 @@
 		<link href="styles/reset.css" rel="stylesheet">
 		<link href="styles/style.css" rel="stylesheet">
 		<script defer src="scripts/url-match.js"></script>
+		<script defer src="scripts/safe-storage.js"></script>
+		<script defer src="scripts/icons.js"></script>
 		<script defer src="scripts/popup.js"></script>
 		<meta name="description" content="A Chrome extension that allows quick annotations directly on live webpages, making it easier to mark up relevant content without leaving the page.">	
 	</head>
 	
 	<body class="notate-popup">
 		<header class="popup-header">
-			<img class="popup-header-favicon" src="images/icon-32.png" alt="Notate icon">
+			<img class="popup-header-favicon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAAyBJREFUeAHFV11IFFEUPnd3wxRzB4PKamMrfRCLVghCpVwJi4KgAiHwZYVE7MGUICiSZgsh+sGfl6AgC+ohJLEnI4T2yYdeEqynfFjJiMjSWX9W3Z293TPjjrPrnZ2JnW0/GObO7r33+853zj27Q4CB/njsBWd8kI18QEGAnIOMQMLVRcraw0Qlj336P8QpmIfElmoHOOK9eSBHCOi6g9l+HvIFSn0OyC+EfAsA2wUEH44C2dkBXbeGLc23LKD/SQj2Hw1C8MGo4Zx5KQri+vd9T0MQ/vYHbBEQGp+Czu5htuFvEFmEI6OT3HmCu3CTIFsEILEeLVdfGkbn9ZTq1tnkwHTaRhhZS8cr7ly9C1JkGWwRwIskNP6VW2iCuyjjuqwFCCUbEWKhvXj90dK6rATo0dnmB39dxcZz95sUIn0N2FaEE5Mz2vhI1V4Y7G/WnECShgsDMB+J5kYAbpLcHIFFhiS3r5/VPkMHgvfV869PkRWYC4ikRpGMsLO1PiUVWA/YH9xumwWkF5LeYkyF17Nde8b+IOlstyUFkmR8llHM4EBzCmEfa9naM+sDcoKCLCcgzi5Zu6hyUSsCJr5818YCx15/bTkELh1TxoQQmJ6ZU+6IbcVbFUekhRVYWFxR7lIE71FYXFqB1dUYuMBMwOcNAT52AnjovXMR3rL8z6275dldBI9uVEFVRQksz34w2hpmY7Tnn4rQX1fOnYPODD+/rETuKSuEd89qoKa6FEqKjeNbjMr3yhve3zV3QNcD6msrDOedqDkINzsa4cCuXxmJk+RnWqeCoijGTB3wHVZtx2rHfBuBsoq6duUknDq+AzKSL6nkgUBgjQlIEPpzgIIJsA68+0ozNpkEq3Y8BZlyjuSVp8eCbLiGS/Az0xQgfIf2mM5RD5UxFNvbplLILQuwBOQn/K94kSdh659SHn8y8qamplg6uSqAsFckm0A55JWNYyIW3NDQkMxbwxwgE5ADoO3n2sMiG8aw2o3muUCOt4DTmfXLKTYhl1PNqBK5mnOu7Xo4SFlXmP0yVCuvzFkJACgocLH+TnvWI99UcDz8BRnBci5duAXwAAAAAElFTkSuQmCC" alt="Notate icon">
 			<h1 class="popup-header-title">Notate</h1>
 			<button class="popup-header-action" data-action="start-annotating" type="button" aria-label="Start notating">
 				<svg width="28" height="28" viewBox="0 0 28 28" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
