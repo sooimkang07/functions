@@ -99,24 +99,14 @@ html {
 
 html {
 	&.is-annotating {
-		*:not(html):not(body) {
-			cursor: pointer;
-		}
-
-		#notate-toolbar *, #notate-toolbar *:hover,
-		#notate-modal *, #notate-modal *:hover,
-		.notate-note, .notate-note *,
-		.notate-note:hover, .notate-note *:hover {
+		#notate-toolbar *,
+		#notate-modal *,
+		.notate-note, .notate-note * {
 			cursor: default;
 		}
 
 		.notate-note,
 		.notate-note:hover {
-			cursor: pointer;
-		}
-
-		.notate-note:active,
-		.notate-note:active * {
 			cursor: pointer;
 		}
 
@@ -146,8 +136,7 @@ html {
 			cursor: pointer;
 		}
 
-		.notate-hover,
-		#notate-img-overlay {
+		[data-action="preview"] {
 			display: none;
 		}
 
@@ -175,6 +164,9 @@ html {
 	background: color-mix(in srgb, var(--color-note) 30%, transparent);
 	pointer-events: none;
 	z-index: var(--toolbar-z);
+	outline: var(--outline-annotating);
+	outline-offset: 0.125rem;
+	border-radius: var(--radius-sm);
 	transition: opacity var(--duration-md) var(--ease);
 }
 
@@ -326,7 +318,7 @@ html {
 			color: var(--color-text);
 		}
 
-		label {
+		&:has([name="annotation-color"]) label {
 			position: relative;
 			inline-size: 1.25rem;
 			block-size: 1.25rem;
@@ -347,6 +339,30 @@ html {
 				opacity: 0;
 				margin: 0;
 				cursor: pointer;
+			}
+		}
+
+		&:has([name="annotation-state"]) label {
+			display: inline-flex;
+			align-items: center;
+			gap: var(--space-2xs);
+			padding-block: var(--space-2xs);
+			padding-inline: var(--space-xs);
+			border-radius: var(--radius-sm);
+			background: var(--color-bg);
+			font-family: var(--font-ui);
+			font-size: var(--fs-regular);
+			text-transform: capitalize;
+			cursor: pointer;
+
+			&:has(:checked),
+			&:focus-within {
+				outline: 0.125rem solid var(--color-text);
+				outline-offset: 0.125rem;
+			}
+
+			input {
+				margin: 0;
 			}
 		}
 	}
@@ -495,6 +511,18 @@ html {
 		color: var(--color-text);
 		overflow-wrap: anywhere;
 		word-break: break-word;
+	}
+
+	small {
+		display: block;
+		margin-block-start: var(--space-2xs);
+		padding-inline-end: var(--space-lg);
+		font-family: var(--font-ui);
+		font-size: var(--fs-regular);
+		line-height: 1.3;
+		color: var(--color-text);
+		opacity: 0.72;
+		text-transform: capitalize;
 	}
 
 	.notate-delete {

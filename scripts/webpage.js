@@ -58,6 +58,10 @@ let isPreviewing = false
 let isMoving = false
 let noteDrag = null
 let noteDidDrag = false
+let pendingInteraction = null
+let lastPointerTarget = null
+let lastPointerX = 0
+let lastPointerY = 0
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
 // save all current annotations in the browser so they still exist when visiting site later
@@ -126,6 +130,7 @@ const resetModalState = () => {
 	textarea.value = ''
 	activeTarget = null
 	editingAnnotationId = null
+	pendingInteraction = null
 }
 
 // close modal
@@ -206,14 +211,55 @@ const syncModalFields = (annotation) => {
 
 	const groupInput = form.querySelector('[name="annotation-group"]')
 	if (groupInput) groupInput.value = annotation?.group || ''
+
+	const interaction = notateNormalizeInteraction(annotation?.interaction || pendingInteraction || {}, activeTarget)
+	form.querySelectorAll('[name="annotation-state"]').forEach((input) => {
+		input.checked = input.value === interaction.kind
+	})
 }
 
 const readModalMeta = () => {
 	return {
 		text: textarea.value.trim(),
 		color: notateNormalizeColor(form.querySelector('[name="annotation-color"]:checked')?.value),
-		group: notateNormalizeGroup(form.querySelector('[name="annotation-group"]')?.value)
+		group: notateNormalizeGroup(form.querySelector('[name="annotation-group"]')?.value),
+		interaction: notateNormalizeInteraction({
+			kind: form.querySelector('[name="annotation-state"]:checked')?.value,
+			cursor: pendingInteraction?.cursor || notateReadCursor(activeTarget),
+			scrollY: pendingInteraction?.scrollY ?? Math.round(window.scrollY)
+		}, activeTarget)
 	}
+}
+
+const inferStateKind = (element, event = {}) => {
+	if (event.shiftKey) return 'cursor'
+	if (event.buttons) return 'active'
+	if (element && document.activeElement === element) return 'focus'
+	return 'hover'
+}
+
+const captureLiveInteraction = (element, kind) => {
+	return notateNormalizeInteraction({
+		kind,
+		cursor: notateReadCursor(element),
+		scrollY: Math.round(window.scrollY)
+	}, element)
+}
+
+const pointerTargetAt = (x, y) => {
+	const hit = document.elementFromPoint(x, y)
+	if (!hit || isBlockedHoverTarget(hit) || isRootHoverTarget(hit)) return null
+	return hit
+}
+
+const openCaptureModal = (kind, event = {}) => {
+	const target = lastPointerTarget?.isConnected
+		? lastPointerTarget
+		: pointerTargetAt(event.clientX ?? lastPointerX, event.clientY ?? lastPointerY)
+	if (!target) return
+
+	pendingInteraction = captureLiveInteraction(target, kind)
+	openCreateModal(target)
 }
 
 // open modal to create a new annotation
@@ -257,6 +303,11 @@ const createToolbar = () => {
 
 	toolbar.innerHTML = `
 		<menu class="notate-toolbar-group">
+			<li>
+				<button class="notate-toolbar-button" type="button" data-action="preview">
+					Preview
+				</button>
+			</li>
 			<li>
 				<button class="notate-toolbar-button" type="button" data-action="edit">
 					Edit
@@ -326,6 +377,15 @@ const createModal = () => {
 				${NOTATE_COLORS.map((color) => `
 					<label data-color="${color}">
 						<input type="radio" name="annotation-color" value="${color}">
+					</label>
+				`).join('')}
+			</fieldset>
+			<fieldset>
+				<legend>State</legend>
+				${NOTATE_STATES.map((state) => `
+					<label>
+						<input type="radio" name="annotation-state" value="${state}">
+						${state}
 					</label>
 				`).join('')}
 			</fieldset>
@@ -523,11 +583,15 @@ const renderAnnotation = (annotation) => {
 	note.className = 'notate-note'
 	note.dataset.id = annotation.id
 	note.dataset.color = notateNormalizeColor(annotation.color)
+	note.dataset.state = notateNormalizeState(annotation.interaction?.kind)
+
+	const stateLabel = notateInteractionLabel(annotation.interaction)
 
 	// "x" corner button to delete the annotation, inserting through html
 	note.innerHTML = `
 		<button class="notate-delete" type="button" aria-label="Delete annotation">×</button>
 		<p>${notateEscapeHtml(annotation.text)}</p>
+		${stateLabel ? `<small>${notateEscapeHtml(stateLabel)}</small>` : ''}
 	`
 
 	note.style.insetBlockStart = `${position.top}px`
@@ -557,7 +621,7 @@ const renderAllAnnotations = () => {
 // saving a new note to create the object, store it, and show it right away
 // Array.push: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push
 // builds a new annotation from activeTarget and text, inserts into annotations, saves it, renders it
-const createAnnotation = async (text, color, group) => {
+const createAnnotation = async (text, color, group, interaction) => {
 	const annotation = notateNormalizeAnnotation({
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
@@ -565,7 +629,8 @@ const createAnnotation = async (text, color, group) => {
 		color,
 		group,
 		offsetInline: 0,
-		offsetBlock: 0
+		offsetBlock: 0,
+		interaction: notateNormalizeInteraction(interaction || pendingInteraction, activeTarget)
 	})
 
 	annotations.push(annotation)
@@ -577,12 +642,13 @@ const createAnnotation = async (text, color, group) => {
 // editing a note updates both the saved data and the visible note text
 // Node.textContent: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
 // updates the matching annotation object, saves annotations, updates the <p> inside .notate-note[data-id="${id}"]
-const updateAnnotation = async (id, text, color, group) => {
+const updateAnnotation = async (id, text, color, group, interaction) => {
 	const annotation = getAnnotationById(id)
 	if (!annotation) return
 	annotation.text = text
 	annotation.color = notateNormalizeColor(color)
 	annotation.group = notateNormalizeGroup(group)
+	annotation.interaction = notateNormalizeInteraction(interaction || pendingInteraction, activeTarget)
 
 	await saveAnnotations()
 
@@ -590,8 +656,20 @@ const updateAnnotation = async (id, text, color, group) => {
 	if (!note) return
 
 	note.dataset.color = annotation.color
+	note.dataset.state = notateNormalizeState(annotation.interaction.kind)
 	const noteText = note.querySelector('p')
 	noteText.textContent = text
+	const stateLabel = notateInteractionLabel(annotation.interaction)
+	let meta = note.querySelector('small')
+	if (stateLabel) {
+		if (!meta) {
+			meta = document.createElement('small')
+			note.append(meta)
+		}
+		meta.textContent = stateLabel
+	} else {
+		meta?.remove()
+	}
 	scaleNoteType(text, note)
 	scaleNoteType(text, noteText)
 }
@@ -695,7 +773,7 @@ const toggleAnnotating = () => {
 // Event.preventDefault: https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault, SubmitEvent.submitter: https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter
 // consolidate to one function so it reads event.submitter.value and textarea.value.trim() to either cancel, ignore blank text, update an existing note, or create a new one
 const saveFromModal = async () => {
-	const { text, color, group } = readModalMeta()
+	const { text, color, group, interaction } = readModalMeta()
 
 	if (!text) {
 		closeModal()
@@ -703,12 +781,12 @@ const saveFromModal = async () => {
 	}
 
 	if (editingAnnotationId) {
-		await updateAnnotation(editingAnnotationId, text, color, group)
+		await updateAnnotation(editingAnnotationId, text, color, group, interaction)
 		closeModal()
 		return
 	}
 
-	await createAnnotation(text, color, group)
+	await createAnnotation(text, color, group, interaction)
 	closeModal()
 }
 
@@ -750,11 +828,20 @@ const onPageClick = (event) => {
 	})
 	const clickedRoot = event.target === document.body || event.target === document.documentElement
 
+	if (isPreviewing && event.altKey && !modal?.open && !clickedInsideBlockedUi && !clickedRoot) {
+		event.preventDefault()
+		event.stopPropagation()
+		lastPointerTarget = event.target
+		openCaptureModal(inferStateKind(event.target, event), event)
+		return
+	}
+
 	if (!isAnnotating || modal?.open || clickedInsideBlockedUi || clickedRoot) return
 
 	event.preventDefault()
 	event.stopPropagation()
 
+	pendingInteraction = captureLiveInteraction(event.target, event.altKey ? inferStateKind(event.target, event) : 'default')
 	openCreateModal(event.target)
 }
 
@@ -789,6 +876,7 @@ const onToolbarClick = async (event) => {
 	const button = event.target.closest('#notate-toolbar [data-action]')
 	const action = button?.dataset.action
 	const toolbarActions = {
+		preview: startPreviewing,
 		edit: startAnnotating,
 		move: startMoving,
 		clear: clearAnnotations,
@@ -809,6 +897,12 @@ const onKeydown = (event) => {
 	if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && modal?.open) {
 		event.preventDefault()
 		saveFromModal()
+		return
+	}
+
+	if (event.altKey && !event.metaKey && !event.ctrlKey && (event.key === 'a' || event.key === 'A') && !modal?.open && (isAnnotating || isPreviewing || isMoving)) {
+		event.preventDefault()
+		openCaptureModal(inferStateKind(lastPointerTarget, event), event)
 		return
 	}
 
@@ -879,9 +973,17 @@ const showNotesOnPage = async (mode = 'annotate', scroll = false, selector = nul
 	if (!scroll) return
 
 	const scrollTarget = () => {
-		const target = selector
-			? document.querySelector(selector)
-			: document.querySelector(annotations[0]?.selector)
+		const annotation = selector
+			? annotations.find((item) => item.selector === selector)
+			: annotations[0]
+		const target = annotation
+			? document.querySelector(annotation.selector)
+			: document.querySelector(selector)
+
+		if (annotation?.interaction?.kind === 'scroll' && Number.isFinite(annotation.interaction.scrollY)) {
+			window.scrollTo({ top: annotation.interaction.scrollY, behavior: 'smooth' })
+			return
+		}
 
 		if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 	}
@@ -943,6 +1045,9 @@ document.addEventListener('click', onPageClick, true)
 document.addEventListener('click', onNoteClick, true)
 document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
+document.addEventListener('keyup', (event) => {
+	if (event.key === 'Alt' && isPreviewing) clearHoverFill()
+})
 document.addEventListener('pointerdown', (event) => {
 	if (!isMoving || event.button !== 0) return
 	if (event.target.closest('.notate-delete')) return
@@ -1027,20 +1132,51 @@ function clearHoverFill() {
 	hoveredEl = null
 }
 
-document.addEventListener('mouseover', (event) => {
-	if (!isAnnotating || isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+const placeHoverOverlay = (element) => {
+	if (!element) return
 
-	window.clearTimeout(hoverLeaveTimer)
-
-	if (hoveredEl && hoveredEl !== event.target) {
-		if (hoverOverlay) {
-			hoverOverlay.remove()
-			hoverOverlay = null
-		} else {
-			hoveredEl.classList.remove('notate-hover')
-		}
+	const rect = element.getBoundingClientRect()
+	if (!hoverOverlay) {
+		hoverOverlay = document.createElement('div')
+		hoverOverlay.id = 'notate-img-overlay'
+		document.body.append(hoverOverlay)
 	}
 
+	hoverOverlay.style.insetBlockStart = `${rect.top}px`
+	hoverOverlay.style.insetInlineStart = `${rect.left}px`
+	hoverOverlay.style.inlineSize = `${rect.width}px`
+	hoverOverlay.style.blockSize = `${rect.height}px`
+}
+
+const shouldAimOverlay = (event) => {
+	if (modal?.open) return false
+	if (isAnnotating) return true
+	if (isPreviewing && event.altKey) return true
+	return false
+}
+
+document.addEventListener('pointermove', (event) => {
+	if (!isAnnotating && !isPreviewing && !isMoving) return
+	if (isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+
+	lastPointerX = event.clientX
+	lastPointerY = event.clientY
+	lastPointerTarget = event.target
+
+	if (shouldAimOverlay(event)) {
+		window.clearTimeout(hoverLeaveTimer)
+		hoveredEl = event.target
+		placeHoverOverlay(event.target)
+		return
+	}
+
+	if (isPreviewing) clearHoverFill()
+}, true)
+
+document.addEventListener('mouseover', (event) => {
+	if (!shouldAimOverlay(event) || isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+
+	window.clearTimeout(hoverLeaveTimer)
 	hoveredEl = event.target
 
 	// check for if it's an image because background-color wasn't working on img elements, so i needed to make a separate hover state for them that puts a yellow overlay div on top of the image instead of trying to change the image's background-color
@@ -1048,23 +1184,25 @@ document.addEventListener('mouseover', (event) => {
 	if (event.target.tagName === 'IMG') {
 		// used same getBoundingClientRect from getNotePosition to position the hoverOverlay exactly on top of the image, then add it to the body so it shows up on top of the image with a yellow background
 		const rect = event.target.getBoundingClientRect()
-		hoverOverlay = document.createElement('div')
-		// id styled in webpage.css
-		hoverOverlay.id = 'notate-img-overlay'
+		if (!hoverOverlay) {
+			hoverOverlay = document.createElement('div')
+			// id styled in webpage.css
+			hoverOverlay.id = 'notate-img-overlay'
+			// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
+			document.body.append(hoverOverlay)
+		}
 		hoverOverlay.style.insetBlockStart = `${rect.top}px`
 		hoverOverlay.style.insetInlineStart = `${rect.left}px`
 		hoverOverlay.style.inlineSize = `${rect.width}px`
 		hoverOverlay.style.blockSize = `${rect.height}px`
-		// https://developer.mozilla.org/en-US/docs/Web/API/Element/append
-		document.body.append(hoverOverlay)
 	} else {
-		event.target.classList.add('notate-hover')
+		placeHoverOverlay(event.target)
 	}
 }, true)
 
 // mouseover/mouseout: https://developer.mozilla.org/en-US/docs/Web/API/Element/mouseover_event
 document.addEventListener('mouseout', (event) => {
-	if (!isAnnotating) return
+	if (!isAnnotating && !(isPreviewing && event.altKey)) return
 
 	const leaving = event.target
 
