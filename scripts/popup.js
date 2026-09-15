@@ -117,7 +117,7 @@ const sendActionToActiveTab = async (action) => {
 		return { ok: false, reason: 'restricted' }
 	}
 
-	await setPendingAnnotationUrl(tab.url)
+	await setPendingAnnotationUrl(tab.url, 'annotate')
 
 	const scriptState = await ensureWebpageScript(tab.id)
 
@@ -131,7 +131,12 @@ const sendActionToActiveTab = async (action) => {
 		// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
 		await chrome.tabs.sendMessage(tab.id, { action })
 		// Only remove if message was received
-		await extensionStorageRemove('notate-pending-url')
+		await extensionStorageRemove([
+			'notate-pending-url',
+			'notate-pending-selector',
+			'notate-pending-at',
+			'notate-pending-mode'
+		])
 		return { ok: true }
 	} catch {
 		// Content script not ready yet so leave pending URL in storage
@@ -165,7 +170,7 @@ const getSortedPages = (storedAnnotations) => {
 const createPageItem = (page) => {
 	const count = page.annotations.length
 	const origin = new URL(page.url).origin
-	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=16`
+	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=32`
 	const annotationItems = [...page.annotations].reverse().map((a) => `
 		<li>
 			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(a.selector)}">${escapeHtml(a.text)}</button>
@@ -175,15 +180,15 @@ const createPageItem = (page) => {
 
 	return `
 		<li class="popup-page-item">
-			<div class="popup-page-row">
+			<section class="popup-page-row">
 				<button class="popup-page-button" type="button" data-url="${escapeHtml(page.url)}">
-					<img class="popup-page-favicon" src="${favicon}" alt="" width="8" height="8">
+					<img class="popup-page-favicon" src="${favicon}" alt="">
 					<span class="popup-page-title">${escapeHtml(page.title || page.url)}</span>
 				</button>
 				<button class="popup-page-toggle" type="button" aria-label="Toggle annotations">
-					<span class="popup-page-count">(${count})</span>
+					<span class="popup-page-count">${count}</span>
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7071 14.7071C12.3166 15.0976 11.6834 15.0976 11.2929 14.7071L6.29289 9.70711C5.90237 9.31658 5.90237 8.68342 6.29289 8.29289C6.68342 7.90237 7.31658 7.90237 7.70711 8.29289L12 12.5858L16.2929 8.29289C16.6834 7.90237 17.3166 7.90237 17.7071 8.29289C18.0976 8.68342 18.0976 9.31658 17.7071 9.70711L12.7071 14.7071Z" fill="currentColor"/></svg>				</button>
-			</div>
+			</section>
 			<ul class="popup-annotation-list" hidden>
 				${annotationItems}
 			</ul>
@@ -211,10 +216,11 @@ const findMatchingTab = async (url) => {
 // write the url I want to annotate into storage so webpage.js can read it after the page loads
 // popup closes before a new tab finishes loading, so need chrome local storage to hold/send the url to webpage.js
 // chrome.storage.local.set: https://developer.chrome.com/docs/extensions/reference/api/storage
-const setPendingAnnotationUrl = async (url) => {
+const setPendingAnnotationUrl = async (url, mode = 'preview') => {
 	await extensionStorageSet({
 		'notate-pending-url': url,
-		'notate-pending-at': Date.now()
+		'notate-pending-at': Date.now(),
+		'notate-pending-mode': mode
 	})
 }
 
@@ -231,7 +237,7 @@ const activateOrOpenPage = async (url, selector = null) => {
 		await extensionStorageRemove('notate-pending-selector')
 	}
 
-	await setPendingAnnotationUrl(url)
+	await setPendingAnnotationUrl(url, 'preview')
 
 	const matchingTab = await findMatchingTab(url)
 
@@ -239,7 +245,6 @@ const activateOrOpenPage = async (url, selector = null) => {
 		try {
 			await chrome.tabs.update(matchingTab.id, { active: true })
 		} catch {
-			// background script can still focus the window after the popup closes
 		}
 
 		try {
@@ -248,24 +253,22 @@ const activateOrOpenPage = async (url, selector = null) => {
 				tabId: matchingTab.id,
 				windowId: matchingTab.windowId,
 				selector,
-				url
+				url,
+				mode: 'preview'
 			})
 		} catch {
 			await ensureWebpageScript(matchingTab.id)
 			try {
 				await chrome.tabs.sendMessage(matchingTab.id, {
-					action: 'enter-annotation-mode-scroll',
+					action: selector ? 'enter-preview-mode-scroll' : 'enter-preview-mode',
 					selector
 				})
 			} catch {
-				// new page load / tabs.onUpdated will pick up pending storage
 			}
 		}
 	} else {
 		await chrome.tabs.create({ url })
 	}
-
-	window.close()
 }
 
 // link each annotated page button
@@ -322,17 +325,34 @@ const onStartAnnotatingClick = async () => {
 
 	if (result?.ok === false) {
 		renderStatusMessage('Notate could not reach this tab. Try a regular http/https page, then click the pencil again.')
-		return
 	}
-
-	window.close()
 }
 
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
+	if (!window.confirm('Clear all notations? This cannot be undone.')) return
+
 	await extensionStorageRemove(storageKey)
 	renderAnnotatedPages()
+}
+
+const onboardKey = 'notate-onboarded'
+
+const showOnboard = (visible) => {
+	const onboard = document.querySelector('.popup-onboard')
+	if (!onboard) return
+	onboard.hidden = !visible
+}
+
+const dismissOnboard = async () => {
+	await extensionStorageSet({ [onboardKey]: true })
+	showOnboard(false)
+}
+
+const initOnboard = async () => {
+	const stored = await extensionStorageGet(onboardKey)
+	showOnboard(!stored[onboardKey])
 }
 
 // initial popup load
@@ -349,8 +369,16 @@ const initPopup = () => {
 	const clearAllButton = document.querySelector('[data-action="clear-all"]')
 	clearAllButton.addEventListener('click', clearAllAnnotations)
 
+	const dismissButton = document.querySelector('[data-action="dismiss-onboard"]')
+	dismissButton?.addEventListener('click', dismissOnboard)
+
+	initOnboard()
 	renderAnnotatedPages().catch(() => {
 		renderStatusMessage('Could not read saved notations. Click Reload on chrome://extensions, and load from a local folder rather than iCloud.')
+	})
+
+	chrome.storage?.onChanged?.addListener((changes) => {
+		if (changes[storageKey]) renderAnnotatedPages()
 	})
 }
 

@@ -54,6 +54,8 @@ let layer
 let toolbar
 
 let isAnnotating = false
+let isPreviewing = false
+let noteDrag = null
 let annotatedClass = 'is-annotated'
 let editingAnnotationId = null
 // save all current annotations in the browser so they still exist when visiting site later
@@ -134,6 +136,53 @@ const closeModal = () => {
 	modal.close()
 }
 
+const remToPx = () => {
+	return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+}
+
+const placeModalNear = (element) => {
+	if (!modal) return
+
+	if (!element?.isConnected) {
+		modal.style.insetBlockStart = '50%'
+		modal.style.insetInlineStart = '50%'
+		modal.style.translate = '-50% -50%'
+		return
+	}
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = element.getBoundingClientRect()
+	const modalRect = modal.getBoundingClientRect()
+	const fallbackModal = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-modal')) || 20)
+	const modalInline = modalRect.width || fallbackModal
+	const modalBlock = modalRect.height || fallbackModal
+	let insetInline = rect.left
+	let insetBlock = rect.bottom + gap
+
+	if (insetInline + modalInline > window.innerWidth - gap) {
+		insetInline = Math.max(gap, window.innerWidth - modalInline - gap)
+	}
+
+	if (insetBlock + modalBlock > window.innerHeight - gap) {
+		insetBlock = Math.max(gap, rect.top - modalBlock - gap)
+	}
+
+	modal.style.insetBlockStart = `${Math.round(insetBlock / rem)}rem`
+	modal.style.insetInlineStart = `${Math.round(insetInline / rem)}rem`
+	modal.style.translate = '0'
+}
+
+const scaleNoteType = (text = '', element) => {
+	if (!element) return
+
+	element.style.setProperty('--note-len', String(text.length))
+}
+
+const confirmClear = () => {
+	return window.confirm('Clear all notations? This cannot be undone.')
+}
+
 // open modal to create a new annotation
 // HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
 // stores the clicked target in activeTarget, clears edit mode, opens modal
@@ -143,7 +192,9 @@ const openCreateModal = (target) => {
 	activeTarget = target
 	editingAnnotationId = null
 	textarea.value = ''
+	scaleNoteType('', textarea)
 	modal.showModal()
+	placeModalNear(target)
 }
 
 // open the modal with an existing annotation
@@ -155,7 +206,9 @@ const openEditModal = (annotation) => {
 	editingAnnotationId = annotation.id
 	activeTarget = document.querySelector(annotation.selector)
 	textarea.value = annotation.text
+	scaleNoteType(annotation.text, textarea)
 	modal.showModal()
+	placeModalNear(activeTarget)
 }
 
 // place clear and exit buttons in toolbar when annotation mode is on
@@ -168,14 +221,23 @@ const createToolbar = () => {
 	toolbar.id = 'notate-toolbar'
 
 	toolbar.innerHTML = `
-		<div class="notate-toolbar-group">
-			<button class="notate-toolbar-button" type="button" data-action="clear">
-				Clear all
-			</button>
-			<button class="notate-toolbar-button" type="button" data-action="exit">
-				Exit Notate
-			</button>
-		</div>
+		<menu class="notate-toolbar-group">
+			<li>
+				<button class="notate-toolbar-button" type="button" data-action="edit">
+					Edit
+				</button>
+			</li>
+			<li>
+				<button class="notate-toolbar-button" type="button" data-action="clear">
+					Clear all
+				</button>
+			</li>
+			<li>
+				<button class="notate-toolbar-button" type="button" data-action="exit">
+					Exit Notate
+				</button>
+			</li>
+		</menu>
 	`
 
 	document.body.append(toolbar)
@@ -232,6 +294,9 @@ const createModal = () => {
 	textarea = modal.querySelector('textarea')
 
 	form.addEventListener('submit', onModalSubmit)
+	textarea.addEventListener('input', () => {
+		scaleNoteType(textarea.value, textarea)
+	})
 }
 
 // give each annotation its own id to reference
@@ -286,9 +351,10 @@ const getAnnotationById = (id) => {
 // using array order instead of DOM order avoids measuring the note itself or notes below it
 // HTMLElement.offsetHeight: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight
 const getNotePosition = (target, selector, annotationId) => {
+	const rem = remToPx()
 	const rect = target.getBoundingClientRect()
-	const gap = 8
-	const noteWidth = 12 * 16
+	const gap = rem / 2
+	const noteWidth = rem * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inline-size-note')) || 18)
 	const viewportLeft = window.scrollX
 	const viewportRight = window.scrollX + window.innerWidth
 
@@ -320,6 +386,10 @@ const getNotePosition = (target, selector, annotationId) => {
 			if (el) top += el.offsetHeight + gap
 		})
 	}
+
+	const annotation = getAnnotationById(annotationId)
+	left += annotation?.offsetInline || 0
+	top += annotation?.offsetBlock || 0
 
 	return { top, left }
 }
@@ -404,6 +474,8 @@ const renderAnnotation = (annotation) => {
 
 	note.style.insetBlockStart = `${position.top}px`
 	note.style.insetInlineStart = `${position.left}px`
+	scaleNoteType(annotation.text, note)
+	scaleNoteType(annotation.text, note.querySelector('p'))
 
 	layer.append(note)
 }
@@ -431,7 +503,9 @@ const createAnnotation = async (text) => {
 	const annotation = {
 		id: createAnnotationId(),
 		selector: getSelector(activeTarget),
-		text
+		text,
+		offsetInline: 0,
+		offsetBlock: 0
 	}
 
 	annotations.push(annotation)
@@ -450,8 +524,12 @@ const updateAnnotation = async (id, text) => {
 	await saveAnnotations()
 
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
+	if (!note) return
+
 	const noteText = note.querySelector('p')
 	noteText.textContent = text
+	scaleNoteType(text, note)
+	scaleNoteType(text, noteText)
 }
 
 // clicking the x fully removes that annotation everywhere
@@ -459,6 +537,7 @@ const updateAnnotation = async (id, text) => {
 // unhighlights the target, filters the item out of annotations, saves again, removes that note element from page
 const deleteAnnotation = async (id) => {
 	const annotation = getAnnotationById(id)
+	if (!annotation) return
 
 	unhighlightTarget(annotation.selector)
 
@@ -475,12 +554,14 @@ const deleteAnnotation = async (id) => {
 
 	// grab annotation by id, unhighlight its target, filter it out of annotations array, save again, then find the note element by id and remove it from the page
 	const note = document.querySelector(`.notate-note[data-id="${id}"]`)
-	note.remove()
+	note?.remove()
 }
 
 // clear this page's annotations everywhere at once
 // resets annotations to an empty array, removes this page from extension storage, clears the layer
 const clearAnnotations = async () => {
+	if (!confirmClear()) return
+
 	clearHighlights()
 
 	annotations = []
@@ -493,8 +574,20 @@ const clearAnnotations = async () => {
 // DOMTokenList.add: https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList/add
 // sets isAnnotating = true, adds 'is-annotating' on document.documentElement, creates toolbar, renders notes
 const startAnnotating = () => {
+	isPreviewing = false
 	isAnnotating = true
+	document.documentElement.classList.remove('is-previewing')
 	document.documentElement.classList.add('is-annotating')
+	createToolbar()
+	renderAllAnnotations()
+}
+
+const startPreviewing = () => {
+	isAnnotating = false
+	isPreviewing = true
+	document.documentElement.classList.remove('is-annotating')
+	document.documentElement.classList.add('is-previewing')
+	clearHoverFill()
 	createToolbar()
 	renderAllAnnotations()
 }
@@ -503,12 +596,14 @@ const startAnnotating = () => {
 // sets isAnnotating = false, removes 'is-annotating', removes toolbar, hides layer, clears highlights
 const stopAnnotating = () => {
 	isAnnotating = false
-	document.documentElement.classList.remove('is-annotating')
+	isPreviewing = false
+	document.documentElement.classList.remove('is-annotating', 'is-previewing')
 	removeToolbar()
 	hideLayer()	
 	if (modal?.open) {
 		closeModal()
 	}
+	clearHoverFill()
 	clearHighlights()
 }
 
@@ -570,8 +665,9 @@ const onPageClick = (event) => {
 	const clickedInsideBlockedUi = blockedSelectors.some((selector) => {
 		return event.target.closest(selector)
 	})
+	const clickedRoot = event.target === document.body || event.target === document.documentElement
 
-	if (!isAnnotating || modal?.open || clickedInsideBlockedUi) return
+	if (!isAnnotating || modal?.open || clickedInsideBlockedUi || clickedRoot) return
 
 	event.preventDefault()
 	event.stopPropagation()
@@ -584,6 +680,7 @@ const onPageClick = (event) => {
 // ignores the delete button, finds the clicked .notate-note, gets its id from note.dataset.id, opens that annotation in edit mode
 const onNoteClick = (event) => {
 	if (event.target.closest('.notate-delete')) return
+	if (noteDrag?.moved) return
 
 	const note = event.target.closest('.notate-note')
 	if (!note) return
@@ -593,6 +690,7 @@ const onNoteClick = (event) => {
 
 	const annotation = getAnnotationById(note.dataset.id)
 
+	if (isPreviewing) startAnnotating()
 	openEditModal(annotation)
 }
 
@@ -605,6 +703,7 @@ const onToolbarClick = async (event) => {
 	const button = event.target.closest('#notate-toolbar [data-action]')
 	const action = button?.dataset.action
 	const toolbarActions = {
+		edit: startAnnotating,
 		clear: clearAnnotations,
 		exit: stopAnnotating
 	}
@@ -620,7 +719,8 @@ const onToolbarClick = async (event) => {
 // Escape key exits annotation mode
 // KeyboardEvent.key: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key
 const onKeydown = (event) => {
-	if (event.key !== 'Escape' || !isAnnotating) return
+	if (event.key !== 'Escape' || (!isAnnotating && !isPreviewing)) return
+	if (modal?.open) return
 
 	stopAnnotating()
 }
@@ -633,7 +733,9 @@ const onKeydown = (event) => {
 const repositionNote = (note) => {
 	const id = note.dataset.id
 	const annotation = getAnnotationById(id)
-	const target = document.querySelector(annotation.selector)
+	const target = document.querySelector(annotation?.selector)
+	if (!annotation || !target) return
+
 	const position = getNotePosition(target, annotation.selector, annotation.id)
 
 	note.style.insetBlockStart = `${position.top}px`
@@ -646,7 +748,7 @@ const repositionNote = (note) => {
 // NodeList.forEach: https://developer.mozilla.org/en-US/docs/Web/API/NodeList/forEach
 // only runs while annotating so this isn't doing extra work all the time
 const repositionAnnotations = () => {
-	if (!isAnnotating || !layer) return
+	if ((!isAnnotating && !isPreviewing) || !layer) return
 
 	layer.querySelectorAll('.notate-note').forEach((note) => {
 		repositionNote(note)
@@ -676,9 +778,10 @@ const scrollToFirstAnnotation = () => {
 // Document.visibilityState: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilityState
 // visibilitychange event: https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
 // Element.scrollIntoView: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
-const enterAnnotationMode = async (scroll = false, selector = null) => {
+const showNotesOnPage = async (mode = 'annotate', scroll = false, selector = null) => {
 	await loadAnnotations()
-	startAnnotating()
+	if (mode === 'preview') startPreviewing()
+	else startAnnotating()
 
 	if (!scroll) return
 
@@ -705,6 +808,14 @@ const enterAnnotationMode = async (scroll = false, selector = null) => {
 	}, { once: true })
 }
 
+const enterAnnotationMode = async (scroll = false, selector = null) => {
+	await showNotesOnPage('annotate', scroll, selector)
+}
+
+const enterPreviewMode = async (scroll = false, selector = null) => {
+	await showNotesOnPage('preview', scroll, selector)
+}
+
 // when page loads, pull this page's annotations from shared extension storage
 // then check if the popup flagged this url to auto-enter annotation mode
 // also checks for a selector in case a specific annotation was clicked in the popup
@@ -715,16 +826,17 @@ const initAnnotations = async () => {
 
 	await loadAnnotations()
 
-	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
+	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode'])
 	const pendingUrl = stored['notate-pending-url']
 	const pendingAge = Date.now() - (stored['notate-pending-at'] || 0)
 
 	if (!pendingUrl || pendingAge > 15000 || !pageUrlsMatch(pendingUrl, location.href)) return
 
-	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
+	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode'])
 
 	const pendingSelector = stored['notate-pending-selector'] || null
-	enterAnnotationMode(true, pendingSelector)
+	const pendingMode = stored['notate-pending-mode'] === 'annotate' ? 'annotate' : 'preview'
+	showNotesOnPage(pendingMode, true, pendingSelector)
 }
 
 initAnnotations()
@@ -738,17 +850,101 @@ document.addEventListener('click', onPageClick, true)
 document.addEventListener('click', onNoteClick, true)
 document.addEventListener('click', onToolbarClick, true)
 document.addEventListener('keydown', onKeydown)
+document.addEventListener('pointerdown', (event) => {
+	if (!isAnnotating || event.button !== 0) return
+	if (event.target.closest('.notate-delete')) return
+
+	const note = event.target.closest('.notate-note')
+	if (!note) return
+
+	const annotation = getAnnotationById(note.dataset.id)
+	if (!annotation) return
+
+	noteDrag = {
+		id: annotation.id,
+		startX: event.clientX,
+		startY: event.clientY,
+		originInline: annotation.offsetInline || 0,
+		originBlock: annotation.offsetBlock || 0,
+		moved: false
+	}
+	note.setPointerCapture(event.pointerId)
+}, true)
+
+document.addEventListener('pointermove', (event) => {
+	if (!noteDrag) return
+
+	const deltaX = event.clientX - noteDrag.startX
+	const deltaY = event.clientY - noteDrag.startY
+	if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) noteDrag.moved = true
+
+	const annotation = getAnnotationById(noteDrag.id)
+	if (!annotation) return
+
+	annotation.offsetInline = Math.round(noteDrag.originInline + deltaX)
+	annotation.offsetBlock = Math.round(noteDrag.originBlock + deltaY)
+	repositionAnnotations()
+}, true)
+
+document.addEventListener('pointerup', async () => {
+	if (!noteDrag) return
+
+	const dragged = noteDrag
+	noteDrag = null
+	if (!dragged.moved) return
+
+	await saveAnnotations()
+}, true)
+
+document.addEventListener('pointercancel', () => {
+	noteDrag = null
+}, true)
 
 // add hover fill to only the exact element under the cursor not with CSS :hover because couldn't keep the hover state to just the hovered element. it was spreading to the whole parent if the hovered element didn't have its own background.
 // closest: https://developer.mozilla.org/en-US/docs/Web/API/Element/closest
 const blockedHoverSelectors = ['#notate-modal', '#notate-toolbar', '.notate-note']
 const isBlockedHoverTarget = (el) => blockedHoverSelectors.some((s) => el.closest(s))
+const isRootHoverTarget = (el) => el === document.body || el === document.documentElement
+
+const coyoteMs = () => {
+	const value = getComputedStyle(document.documentElement).getPropertyValue('--duration-md').trim()
+	const parsed = parseFloat(value)
+	return Number.isFinite(parsed) ? parsed : 180
+}
 
 // overlay a temporary yellow div over images on hover since background-color doesn't work over <img>
 let hoverOverlay = null
+let hoveredEl = null
+let hoverLeaveTimer = null
+
+function clearHoverFill() {
+	if (hoverOverlay) {
+		hoverOverlay.remove()
+		hoverOverlay = null
+	}
+
+	if (hoveredEl?.classList.contains('notate-hover')) {
+		hoveredEl.classList.remove('notate-hover')
+	}
+
+	hoveredEl = null
+}
 
 document.addEventListener('mouseover', (event) => {
-	if (!isAnnotating || isBlockedHoverTarget(event.target)) return
+	if (!isAnnotating || isBlockedHoverTarget(event.target) || isRootHoverTarget(event.target)) return
+
+	window.clearTimeout(hoverLeaveTimer)
+
+	if (hoveredEl && hoveredEl !== event.target) {
+		if (hoverOverlay) {
+			hoverOverlay.remove()
+			hoverOverlay = null
+		} else {
+			hoveredEl.classList.remove('notate-hover')
+		}
+	}
+
+	hoveredEl = event.target
 
 	// check for if it's an image because background-color wasn't working on img elements, so i needed to make a separate hover state for them that puts a yellow overlay div on top of the image instead of trying to change the image's background-color
 	// googled: "how to check if element is an image javascript" and found tagName property as second option which took me to this: https://www.encodedna.com/javascript/check-if-element-is-an-image-using-javascript-tagname-property.htm#:~:text=Let%20us%20assume%20I%20have,the%20ID%20of%20each%20image.
@@ -773,12 +969,12 @@ document.addEventListener('mouseover', (event) => {
 document.addEventListener('mouseout', (event) => {
 	if (!isAnnotating) return
 
-	if (hoverOverlay) {
-		hoverOverlay.remove()
-		hoverOverlay = null
-	} else {
-		event.target.classList.remove('notate-hover')
-	}
+	const leaving = event.target
+
+	hoverLeaveTimer = window.setTimeout(() => {
+		if (hoveredEl !== leaving) return
+		clearHoverFill()
+	}, coyoteMs())
 }, true)
 
 window.addEventListener('scroll', repositionAnnotations)
@@ -797,6 +993,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	const runtimeActions = {
 		'enter-annotation-mode': () => enterAnnotationMode(false),
 		'enter-annotation-mode-scroll': () => enterAnnotationMode(true, message.selector || null),
+		'enter-preview-mode': () => enterPreviewMode(false),
+		'enter-preview-mode-scroll': () => enterPreviewMode(true, message.selector || null),
 		'toggle-annotate-mode': toggleAnnotating,
 		'clear-annotations': clearAnnotations
 	}
