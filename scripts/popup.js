@@ -345,69 +345,125 @@ const clearGroupTabDropState = (menu) => {
 	})
 }
 
+const findGroupTabDrop = (menu, clientX) => {
+	const items = [...menu.querySelectorAll('li[data-group]')]
+	let dropItem = items[0] || null
+	let after = false
+
+	items.forEach((item) => {
+		const rect = item.getBoundingClientRect()
+		if (clientX >= rect.left) {
+			dropItem = item
+			after = clientX > rect.left + rect.width / 2
+		}
+	})
+
+	return { dropItem, after }
+}
+
 const bindGroupTabDrag = (menu, names) => {
-	let dragging = ''
-	let didDrag = false
+	let drag = null
+	let suppressClick = false
 
-	menu.addEventListener('dragstart', (event) => {
-		const item = event.target.closest('li[draggable="true"]')
-		if (!item || !event.dataTransfer) return
+	const paintDrop = (clientX) => {
+		if (!drag?.started) return
 
-		dragging = item.dataset.group || ''
-		didDrag = false
-		event.dataTransfer.effectAllowed = 'move'
-		event.dataTransfer.setData('text/plain', dragging)
-		item.classList.add('is-dragging')
-	})
-
-	menu.addEventListener('dragover', (event) => {
-		const item = event.target.closest('li')
-		if (!item || !dragging) return
-
-		event.preventDefault()
-		if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-		didDrag = true
 		clearGroupTabDropState(menu)
-		menu.querySelector(`li[data-group="${CSS.escape(dragging)}"]`)?.classList.add('is-dragging')
+		drag.item.classList.add('is-dragging')
+		const { dropItem, after } = findGroupTabDrop(menu, clientX)
+		dropItem?.classList.add(after ? 'is-drop-after' : 'is-drop-before')
+	}
 
-		const rect = item.getBoundingClientRect()
-		const after = event.clientX > rect.left + rect.width / 2
-		item.classList.add(after ? 'is-drop-after' : 'is-drop-before')
-	})
+	const stopWindowDrag = () => {
+		window.removeEventListener('pointermove', onWindowPointerMove)
+		window.removeEventListener('pointerup', onWindowPointerUp)
+		window.removeEventListener('pointercancel', onWindowPointerCancel)
+	}
 
-	menu.addEventListener('dragleave', (event) => {
-		if (menu.contains(event.relatedTarget)) return
+	const finishDrag = async (event) => {
+		if (!drag) return
+
+		const { name, started, pointerId, item } = drag
+		const { dropItem, after } = findGroupTabDrop(menu, event.clientX)
 		clearGroupTabDropState(menu)
-		menu.querySelector(`li[data-group="${CSS.escape(dragging)}"]`)?.classList.add('is-dragging')
-	})
+		drag = null
+		stopWindowDrag()
 
-	menu.addEventListener('drop', async (event) => {
-		event.preventDefault()
-		const item = event.target.closest('li')
-		const from = event.dataTransfer?.getData('text/plain') || dragging
-		clearGroupTabDropState(menu)
-		if (!item || !from) return
+		try {
+			item.releasePointerCapture(pointerId)
+		} catch {
+		}
 
-		const to = item.dataset.group || ''
-		const rect = item.getBoundingClientRect()
-		const after = event.clientX > rect.left + rect.width / 2
-		const next = notateMoveGroupName(names, from, to, after)
-		dragging = ''
-		didDrag = true
+		if (!started || !name) return
+
+		suppressClick = true
+		const to = dropItem?.dataset.group || ''
+		const next = notateMoveGroupName(names, name, to, after)
 		await setGroupOrder(next)
 		renderAnnotatedPages()
-	})
+	}
 
-	menu.addEventListener('dragend', () => {
+	const onWindowPointerMove = (event) => {
+		if (!drag || event.pointerId !== drag.pointerId) return
+		if (!drag.started) {
+			if (Math.abs(event.clientX - drag.startX) < 8) return
+			drag.started = true
+		}
+
+		event.preventDefault()
+		paintDrop(event.clientX)
+	}
+
+	const onWindowPointerUp = (event) => {
+		if (!drag || event.pointerId !== drag.pointerId) return
+		finishDrag(event)
+	}
+
+	const onWindowPointerCancel = (event) => {
+		if (!drag || event.pointerId !== drag.pointerId) return
+
+		const { pointerId, item } = drag
 		clearGroupTabDropState(menu)
-		dragging = ''
+		drag = null
+		stopWindowDrag()
+
+		try {
+			item.releasePointerCapture(pointerId)
+		} catch {
+		}
+	}
+
+	menu.querySelectorAll('li[data-group]').forEach((item) => {
+		const name = item.dataset.group || ''
+		if (!name) return
+
+		item.addEventListener('pointerdown', (event) => {
+			if (event.button !== 0) return
+
+			drag = {
+				name,
+				item,
+				started: false,
+				startX: event.clientX,
+				pointerId: event.pointerId
+			}
+
+			try {
+				item.setPointerCapture(event.pointerId)
+			} catch {
+			}
+
+			window.addEventListener('pointermove', onWindowPointerMove, { passive: false })
+			window.addEventListener('pointerup', onWindowPointerUp)
+			window.addEventListener('pointercancel', onWindowPointerCancel)
+		})
 	})
 
 	menu.addEventListener('click', (event) => {
-		if (!didDrag) return
+		if (!suppressClick) return
 		event.preventDefault()
-		event.stopPropagation()
-		didDrag = false
+		event.stopImmediatePropagation()
+		suppressClick = false
 	}, true)
 }
 
@@ -429,11 +485,10 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 			: ''
 		const colorAttr = color ? ` data-color="${escapeHtml(color)}"` : ''
 		const isSelected = value === selected
-		const dragAttr = value ? ' draggable="true"' : ''
 
 		return `
-			<li data-group="${escapeHtml(value)}"${dragAttr}>
-				<button type="button" data-action="view-group" data-group="${escapeHtml(value)}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
+			<li data-group="${escapeHtml(value)}">
+				<button type="button" draggable="false" data-action="view-group" data-group="${escapeHtml(value)}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
 			</li>
 		`
 	}).join('')

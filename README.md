@@ -11,7 +11,7 @@ Use a copy that stays on this Mac:
 1. Open Terminal in this project folder and run:
    `chmod +x copy-to-local.sh && ./copy-to-local.sh`
 2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
-3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.11**.
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.12**.
 4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **side panel** that stays open while you scroll and switch pages.
 5. **New** only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be marked. Open a website first, or click a saved page in the side panel.
 6. How it works: **New** → click the element that caught your eye → write why it mattered → pick an existing **Group** or choose **New group** and name it → pick a **Color** → Save (⌘↩). If a group tab is selected, New starts in that group. The library opens on **All** (newest notes first). Scroll the tabs at the top to filter by group, or drag a named group tab to reorder it. **Done** finishes adding, or puts Notate away. Drag a note to move it while adding.

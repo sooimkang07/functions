@@ -372,12 +372,14 @@ header {
 		list-style: none;
 		user-select: none;
 
-		&[draggable="true"] {
+		&[data-group]:not([data-group=""]) {
 			cursor: grab;
+			touch-action: none;
 		}
 
 		&.is-dragging {
 			opacity: 0.4;
+			cursor: grabbing;
 		}
 
 		&.is-drop-before {
@@ -442,8 +444,13 @@ header {
 		}
 	}
 
-	li[draggable="true"] button {
+	li[data-group]:not([data-group=""]) button {
 		cursor: grab;
+		touch-action: none;
+	}
+
+	li.is-dragging button {
+		cursor: grabbing;
 	}
 }
 
