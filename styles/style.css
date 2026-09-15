@@ -517,6 +517,8 @@ header {
 }
 
 #group-edit-dialog {
+	inset: 0;
+	margin: auto;
 	inline-size: min(18rem, calc(100% - var(--space-xl)));
 	padding: var(--space-sm);
 	border: var(--border-ui);
