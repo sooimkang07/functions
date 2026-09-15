@@ -64,9 +64,7 @@ let storageKey = 'notate-annotations'
 // keep one shared saved object in chrome storage so popup and content script can both read it
 // chrome.storage.local.get: https://developer.chrome.com/docs/extensions/reference/api/storage, async: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function, await from Eric demo, logical OR operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR
 const getStoredAnnotations = async () => {
-	if (!chrome?.storage?.local) return {}
-
-	const stored = await chrome.storage.local.get(storageKey)
+	const stored = await extensionStorageGet(storageKey)
 	return stored[storageKey] || {}
 }
 
@@ -92,7 +90,7 @@ const saveAnnotations = async () => {
 		updatedAt: Date.now()
 	}
 
-	await chrome.storage.local.set({
+	await extensionStorageSet({
 		[storageKey]: storedAnnotations
 	})
 }
@@ -112,7 +110,7 @@ const removeStoredPage = async () => {
 	const storedAnnotations = await getStoredAnnotations()
 	delete storedAnnotations[getPageKey(storedAnnotations)]
 
-	await chrome.storage.local.set({
+	await extensionStorageSet({
 		[storageKey]: storedAnnotations
 	})
 }
@@ -713,17 +711,17 @@ const enterAnnotationMode = async (scroll = false, selector = null) => {
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage
 // async functions: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function
 const initAnnotations = async () => {
-	if (!chrome?.storage?.local) return
+	if (!getExtensionStorage()) return
 
 	await loadAnnotations()
 
-	const stored = await chrome.storage.local.get(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
+	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
 	const pendingUrl = stored['notate-pending-url']
 	const pendingAge = Date.now() - (stored['notate-pending-at'] || 0)
 
 	if (!pendingUrl || pendingAge > 15000 || !pageUrlsMatch(pendingUrl, location.href)) return
 
-	await chrome.storage.local.remove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
+	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at'])
 
 	const pendingSelector = stored['notate-pending-selector'] || null
 	enterAnnotationMode(true, pendingSelector)

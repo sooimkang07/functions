@@ -1,4 +1,4 @@
-importScripts('url-match.js')
+importScripts('url-match.js', 'safe-storage.js', 'icons.js')
 
 const pingTab = async (tabId) => {
 	await chrome.tabs.sendMessage(tabId, { action: 'notate-ping' })
@@ -7,7 +7,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/url-match.js', 'scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -37,7 +37,7 @@ const isFreshPending = (stored = {}) => {
 }
 
 const clearPending = async () => {
-	await chrome.storage.local.remove([
+	await extensionStorageRemove([
 		'notate-pending-url',
 		'notate-pending-selector',
 		'notate-pending-at'
@@ -58,7 +58,7 @@ const enterOnTab = async (tabId, selector) => {
 const tryEnterPendingOnTab = async (tab) => {
 	if (!tab?.id || !tab.url) return
 
-	const stored = await chrome.storage.local.get([
+	const stored = await extensionStorageGet([
 		'notate-pending-url',
 		'notate-pending-selector',
 		'notate-pending-at'
@@ -82,7 +82,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	const { tabId, windowId, selector } = message
 
 	const activateTab = async () => {
-		const stored = await chrome.storage.local.get('notate-pending-selector')
+		const stored = await extensionStorageGet('notate-pending-selector')
 		const nextSelector = selector || stored['notate-pending-selector'] || null
 
 		if (windowId) {
@@ -111,3 +111,47 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 	if (changeInfo.status !== 'complete') return
 	tryEnterPendingOnTab(tab)
 })
+
+const imageDataFromDataUri = async (dataUri) => {
+	const response = await fetch(dataUri)
+	const blob = await response.blob()
+	const bitmap = await createImageBitmap(blob)
+	const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+	const context = canvas.getContext('2d')
+	context.drawImage(bitmap, 0, 0)
+	return context.getImageData(0, 0, bitmap.width, bitmap.height)
+}
+
+const applyToolbarIcon = async () => {
+	try {
+		const response = await fetch(chrome.runtime.getURL('images/icon-32.png'))
+		const blob = await response.blob()
+		if (response.ok && blob.size > 50) {
+			await chrome.action.setIcon({
+				path: {
+					16: 'images/icon-16.png',
+					32: 'images/icon-32.png',
+					48: 'images/icon-48.png',
+					128: 'images/icon-128.png'
+				}
+			})
+			return
+		}
+	} catch {
+		// iCloud placeholders and missing files fall through to the embedded icon
+	}
+
+	try {
+		const imageData = {
+			16: await imageDataFromDataUri(NOTATE_ICON_16_DATA_URI),
+			32: await imageDataFromDataUri(NOTATE_ICON_32_DATA_URI)
+		}
+		await chrome.action.setIcon({ imageData })
+	} catch {
+		// leave Chrome's default icon
+	}
+}
+
+chrome.runtime.onInstalled.addListener(applyToolbarIcon)
+chrome.runtime.onStartup.addListener(applyToolbarIcon)
+applyToolbarIcon()
