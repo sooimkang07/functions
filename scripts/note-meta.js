@@ -4,6 +4,8 @@
 	globalThis.NOTATE_COLORS = ['yellow', 'mint', 'sky', 'peach', 'lilac', 'rose']
 	globalThis.NOTATE_COLOR_DEFAULT = 'yellow'
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
+	globalThis.NOTATE_STATES = ['default', 'hover', 'active', 'focus', 'scroll', 'cursor']
+	globalThis.NOTATE_STATE_DEFAULT = 'default'
 
 	globalThis.notateEscapeHtml = (value = '') => {
 		return String(value)
@@ -20,12 +22,45 @@
 
 	globalThis.notateNormalizeGroup = (group = '') => String(group).trim()
 
+	globalThis.notateNormalizeState = (kind) => {
+		return globalThis.NOTATE_STATES.includes(kind) ? kind : globalThis.NOTATE_STATE_DEFAULT
+	}
+
+	globalThis.notateReadCursor = (element) => {
+		if (!element || element.nodeType !== 1) return 'auto'
+		try {
+			return getComputedStyle(element).cursor || 'auto'
+		} catch {
+			return 'auto'
+		}
+	}
+
+	globalThis.notateNormalizeInteraction = (interaction = {}, element) => {
+		const kind = globalThis.notateNormalizeState(interaction.kind)
+		const cursor = String(interaction.cursor || globalThis.notateReadCursor(element) || 'auto')
+		const scrollY = Number.isFinite(Number(interaction.scrollY))
+			? Math.round(Number(interaction.scrollY))
+			: Math.round(globalThis.scrollY || 0)
+
+		return { kind, cursor, scrollY }
+	}
+
+	globalThis.notateInteractionLabel = (interaction = {}) => {
+		const { kind, cursor } = globalThis.notateNormalizeInteraction(interaction)
+		if (kind === globalThis.NOTATE_STATE_DEFAULT) return ''
+		if (kind === 'cursor' || (cursor && cursor !== 'auto' && cursor !== 'default')) {
+			return `${kind} · ${cursor}`
+		}
+		return kind
+	}
+
 	globalThis.notateNormalizeAnnotation = (annotation = {}) => ({
 		...annotation,
 		color: globalThis.notateNormalizeColor(annotation.color),
 		group: globalThis.notateNormalizeGroup(annotation.group),
 		offsetInline: annotation.offsetInline || 0,
-		offsetBlock: annotation.offsetBlock || 0
+		offsetBlock: annotation.offsetBlock || 0,
+		interaction: globalThis.notateNormalizeInteraction(annotation.interaction)
 	})
 
 	globalThis.notateGroupKey = (group) => {
