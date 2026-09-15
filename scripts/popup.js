@@ -136,6 +136,10 @@ const sendActionToActiveTab = async (action) => {
 
 	await setPendingAnnotationUrl(tab.url, 'annotate')
 
+	const selectedGroup = await getLibraryGroup()
+	const groupName = selectedGroup === NOTATE_UNGROUPED ? '' : notateNormalizeGroup(selectedGroup)
+	await extensionStorageSet({ 'notate-pending-group': groupName })
+
 	const scriptState = await ensureWebpageScript(tab.id)
 
 	if (scriptState === 'missing') {
@@ -146,7 +150,7 @@ const sendActionToActiveTab = async (action) => {
 
 	try {
 		// chrome.tabs.sendMessage: https://developer.chrome.com/docs/extensions/reference/api/tabs
-		await chrome.tabs.sendMessage(tab.id, { action })
+		await chrome.tabs.sendMessage(tab.id, { action, group: groupName })
 		// Only remove if message was received
 		await extensionStorageRemove([
 			'notate-pending-url',
