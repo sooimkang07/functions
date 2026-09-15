@@ -187,7 +187,24 @@ const scaleNoteType = (text = '', element) => {
 }
 
 const confirmClear = () => {
-	return window.confirm('Clear all notations? This cannot be undone.')
+	return window.confirm('Clear every note on this page? This cannot be undone.')
+}
+
+const syncModalCopy = () => {
+	if (!modal) return
+
+	const heading = modal.querySelector('h2')
+	const hint = modal.querySelector('form > p')
+
+	if (heading) {
+		heading.textContent = editingAnnotationId ? 'Edit this note' : 'What caught your attention?'
+	}
+
+	if (hint) {
+		hint.textContent = editingAnnotationId
+			? 'Update why this mattered.'
+			: 'Write why it mattered. This note stays on this element.'
+	}
 }
 
 const fillGroupOptions = () => {
@@ -273,6 +290,7 @@ const openCreateModal = (target) => {
 	textarea.value = ''
 	scaleNoteType('', textarea)
 	syncModalFields()
+	syncModalCopy()
 	modal.showModal()
 	placeModalNear(target)
 }
@@ -288,6 +306,7 @@ const openEditModal = (annotation) => {
 	textarea.value = annotation.text
 	scaleNoteType(annotation.text, textarea)
 	syncModalFields(annotation)
+	syncModalCopy()
 	modal.showModal()
 	placeModalNear(activeTarget)
 }
@@ -296,42 +315,82 @@ const openEditModal = (annotation) => {
 // Document.createElement: https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement, Element.append: https://developer.mozilla.org/en-US/docs/Web/API/Element/append
 // builds #notate-toolbar, fills it with the two buttons, inserts it into document.body to show up on page
 const createToolbar = () => {
-	if (toolbar) return
+	if (!toolbar) {
+		toolbar = document.createElement('aside')
+		toolbar.id = 'notate-toolbar'
 
-	toolbar = document.createElement('aside')
-	toolbar.id = 'notate-toolbar'
+		toolbar.innerHTML = `
+			<p></p>
+			<menu class="notate-toolbar-group">
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="edit">
+						Add
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="preview">
+						Done
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="move">
+						Reposition
+					</button>
+				</li>
+			</menu>
+			<menu class="notate-toolbar-group">
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="clear">
+						Clear
+					</button>
+				</li>
+				<li>
+					<button class="notate-toolbar-button" type="button" data-action="exit">
+						Hide
+					</button>
+				</li>
+			</menu>
+		`
 
-	toolbar.innerHTML = `
-		<menu class="notate-toolbar-group">
-			<li>
-				<button class="notate-toolbar-button" type="button" data-action="preview">
-					Preview
-				</button>
-			</li>
-			<li>
-				<button class="notate-toolbar-button" type="button" data-action="edit">
-					Edit
-				</button>
-			</li>
-			<li>
-				<button class="notate-toolbar-button" type="button" data-action="move">
-					Move
-				</button>
-			</li>
-			<li>
-				<button class="notate-toolbar-button" type="button" data-action="clear">
-					Clear all
-				</button>
-			</li>
-			<li>
-				<button class="notate-toolbar-button" type="button" data-action="exit">
-					Exit Notate
-				</button>
-			</li>
-		</menu>
-	`
+		toolbar.setAttribute('aria-label', 'Notate')
+		document.body.append(toolbar)
+	}
 
-	document.body.append(toolbar)
+	refreshToolbar()
+}
+
+const refreshToolbar = () => {
+	if (!toolbar) return
+
+	toolbar.classList.toggle('is-previewing', isPreviewing)
+	toolbar.classList.toggle('is-annotating', isAnnotating)
+	toolbar.classList.toggle('is-moving', isMoving)
+
+	const status = toolbar.querySelector(':scope > p')
+	if (status) {
+		if (isMoving) {
+			status.textContent = 'Drag a note to move it.'
+		} else if (isAnnotating) {
+			status.textContent = 'Click what caught your eye.'
+		} else if (isPreviewing) {
+			status.textContent = 'Your notes on this page.'
+		} else {
+			status.textContent = ''
+		}
+	}
+
+	const labels = {
+		preview: isPreviewing ? 'Review' : 'Done',
+		edit: 'Add',
+		move: 'Reposition',
+		clear: 'Clear',
+		exit: 'Hide'
+	}
+
+	toolbar.querySelectorAll('[data-action]').forEach((button) => {
+		const label = labels[button.dataset.action]
+		if (label) button.textContent = label
+	})
 }
 
 // remove toolbar when annotate mode off
@@ -366,9 +425,11 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<textarea id="annotation-text" name="annotation-text"></textarea>
+			<h2>What caught your attention?</h2>
+			<p>Write why it mattered. This note stays on this element.</p>
+			<textarea id="annotation-text" name="annotation-text" placeholder="Why did this matter?"></textarea>
 			<label>
-				Group
+				Group (optional)
 				<input name="annotation-group" list="notate-groups" autocomplete="off">
 			</label>
 			<datalist id="notate-groups"></datalist>
@@ -381,11 +442,11 @@ const createModal = () => {
 				`).join('')}
 			</fieldset>
 			<fieldset>
-				<legend>State</legend>
+				<legend>When you saw this</legend>
 				${NOTATE_STATES.map((state) => `
 					<label>
 						<input type="radio" name="annotation-state" value="${state}">
-						${state}
+						${notateStateLabel(state)}
 					</label>
 				`).join('')}
 			</fieldset>
@@ -394,7 +455,7 @@ const createModal = () => {
 					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
-					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save <kbd>⌘↩</kbd></button>
+					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save note <kbd>⌘↩</kbd></button>
 				</li>
 			</menu>
 		</form>
@@ -863,7 +924,6 @@ const onNoteClick = (event) => {
 
 	const annotation = getAnnotationById(note.dataset.id)
 
-	if (isPreviewing) startAnnotating()
 	openEditModal(annotation)
 }
 
@@ -1049,7 +1109,7 @@ document.addEventListener('keyup', (event) => {
 	if (event.key === 'Alt' && isPreviewing) clearHoverFill()
 })
 document.addEventListener('pointerdown', (event) => {
-	if (!isMoving || event.button !== 0) return
+	if ((!isMoving && !isAnnotating) || event.button !== 0) return
 	if (event.target.closest('.notate-delete')) return
 
 	const note = event.target.closest('.notate-note')
@@ -1071,7 +1131,7 @@ document.addEventListener('pointerdown', (event) => {
 }, true)
 
 document.addEventListener('pointermove', (event) => {
-	if (!noteDrag || !isMoving) return
+	if (!noteDrag) return
 
 	const deltaX = event.clientX - noteDrag.startX
 	const deltaY = event.clientY - noteDrag.startY

@@ -11,6 +11,7 @@ html {
 	--font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
 	--font-note: "Gaegu", sans-serif;
 
+	--fs-sm: 0.75rem;
 	--fs-regular: 0.875rem;
 	--fs-note-md: 1.25rem;
 	--fs-note: 1.6rem;
@@ -32,6 +33,7 @@ html {
 	--radius-pill: 100vmax;
 
 	--color-text: #272727;
+	--color-text-secondary: #5f6368;
 	--color-note: #ffe992;
 	--color-note-hover: #fff5cd;
 	--color-note-accent:#e6c200;
@@ -45,6 +47,7 @@ html {
 	--color-hover: #f2f2f2;
 	--color-border: #dadce0;
 	--color-scrim: color-mix(in srgb, #000 40%, transparent);
+	--color-clear: #c0392b;
 
 	--border-ui: 0.0625rem solid var(--color-border);
 
@@ -110,8 +113,18 @@ html {
 			cursor: pointer;
 		}
 
+		.notate-note:active,
+		.notate-note:active * {
+			cursor: grabbing;
+		}
+
 		[data-action="edit"] {
 			display: none;
+		}
+
+		#notate-toolbar [data-action="preview"] {
+			background: var(--color-text);
+			color: var(--color-bg);
 		}
 	}
 
@@ -129,6 +142,11 @@ html {
 		[data-action="move"] {
 			display: none;
 		}
+
+		#notate-toolbar [data-action="preview"] {
+			background: var(--color-text);
+			color: var(--color-bg);
+		}
 	}
 
 	&.is-previewing {
@@ -142,6 +160,15 @@ html {
 
 		[data-action="move"] {
 			display: none;
+		}
+
+		[data-action="clear"] {
+			display: none;
+		}
+
+		#notate-toolbar [data-action="edit"] {
+			background: var(--color-text);
+			color: var(--color-bg);
 		}
 	}
 }
@@ -180,28 +207,47 @@ html {
 	inset-block-start: var(--inline-offset-toolbar);
 	inset-inline-end: var(--inline-offset-toolbar);
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-xs);
-	padding: var(--space-xs);
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-sm);
 	font-family: var(--font-ui);
 	inline-size: max-content;
 	max-inline-size: calc(100vw - (var(--space-md) * 2));
 	z-index: var(--toolbar-z);
 	color-scheme: light;
-	background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+	background: color-mix(in srgb, var(--color-bg) 92%, transparent);
 	border: var(--border-ui);
-	border-radius: var(--radius-md);
+	border-radius: var(--radius-pill);
 	box-shadow: var(--shadow-md);
 	backdrop-filter: blur(var(--blur-toolbar));
 	-webkit-backdrop-filter: blur(var(--blur-toolbar));
+
+	> p {
+		margin: 0;
+		padding-inline: var(--space-xs);
+		font-family: var(--font-ui);
+		font-size: var(--fs-sm);
+		font-weight: var(--fw-medium);
+		line-height: 1.3;
+		color: var(--color-text);
+		flex: 1 1 9rem;
+		min-inline-size: 8rem;
+	}
 
 	.notate-toolbar-group {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-xs);
+		gap: var(--space-2xs);
 		margin: 0;
 		padding: 0;
+
+		+ .notate-toolbar-group {
+			padding-inline-start: var(--space-xs);
+			border-inline-start: var(--border-ui);
+		}
 
 		li {
 			display: flex;
@@ -212,15 +258,15 @@ html {
 	}
 
 	.notate-toolbar-button {
-		padding-block: var(--space-xs);
+		padding-block: var(--space-2xs);
 		padding-inline: var(--space-sm);
-		border: var(--border-ui);
-		border-radius: var(--radius-sm);
-		background: var(--color-bg);
+		border: none;
+		border-radius: var(--radius-pill);
+		background: transparent;
 		color: var(--color-text);
 		cursor: pointer;
 		font-family: var(--font-ui);
-		font-size: var(--fs-regular);
+		font-size: var(--fs-sm);
 		font-weight: var(--fw-medium);
 		line-height: 1.4;
 		white-space: nowrap;
@@ -237,6 +283,10 @@ html {
 		&:focus-visible {
 			outline: 0.125rem solid var(--color-note-accent);
 			outline-offset: 0.125rem;
+		}
+
+		&[data-action="clear"]:hover {
+			color: var(--color-clear);
 		}
 	}
 }
@@ -279,14 +329,31 @@ html {
 		gap: var(--space-sm);
 	}
 
+	h2 {
+		margin: 0;
+		font-family: var(--font-ui);
+		font-size: var(--fs-note-md);
+		font-weight: var(--fw-medium);
+		line-height: 1.2;
+		color: var(--color-text);
+	}
+
+	form > p {
+		margin: 0;
+		font-family: var(--font-ui);
+		font-size: var(--fs-regular);
+		line-height: 1.4;
+		color: var(--color-text-secondary);
+	}
+
 	form > label {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xs);
 		font-family: var(--font-ui);
-		font-size: var(--fs-regular);
+		font-size: var(--fs-sm);
 		font-weight: var(--fw-medium);
-		color: var(--color-text);
+		color: var(--color-text-secondary);
 
 		input {
 			inline-size: 100%;
@@ -313,9 +380,9 @@ html {
 			inline-size: 100%;
 			margin-block-end: var(--space-2xs);
 			font-family: var(--font-ui);
-			font-size: var(--fs-regular);
+			font-size: var(--fs-sm);
 			font-weight: var(--fw-medium);
-			color: var(--color-text);
+			color: var(--color-text-secondary);
 		}
 
 		&:has([name="annotation-color"]) label {
@@ -348,11 +415,10 @@ html {
 			gap: var(--space-2xs);
 			padding-block: var(--space-2xs);
 			padding-inline: var(--space-xs);
-			border-radius: var(--radius-sm);
+			border-radius: var(--radius-pill);
 			background: var(--color-bg);
 			font-family: var(--font-ui);
-			font-size: var(--fs-regular);
-			text-transform: capitalize;
+			font-size: var(--fs-sm);
 			cursor: pointer;
 
 			&:has(:checked),
@@ -389,6 +455,11 @@ html {
 		box-shadow: none;
 		appearance: none;
 		scrollbar-width: none;
+
+		&::placeholder {
+			color: var(--color-text-secondary);
+			opacity: 0.8;
+		}
 
 		&::selection {
 			background: Highlight;
@@ -522,7 +593,6 @@ html {
 		line-height: 1.3;
 		color: var(--color-text);
 		opacity: 0.72;
-		text-transform: capitalize;
 	}
 
 	.notate-delete {
