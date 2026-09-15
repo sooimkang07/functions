@@ -241,6 +241,10 @@ header {
 			outline: 0.125rem solid var(--color-note-accent);
 			outline-offset: 0.125rem;
 		}
+
+		&[hidden] {
+			display: none;
+		}
 	}
 }
 

@@ -64,7 +64,7 @@ html {
 	--duration-coyote: var(--duration-md);
 
 	--inline-size-note: 18rem;
-	--inline-size-modal: 20rem;
+	--inline-size-modal: 22rem;
 	--min-block-modal: 8rem;
 	--inline-offset-toolbar: 1rem;
 	--blur-toolbar: 1.25rem;
@@ -224,6 +224,10 @@ html {
 	backdrop-filter: blur(var(--blur-toolbar));
 	-webkit-backdrop-filter: blur(var(--blur-toolbar));
 
+	&[hidden] {
+		display: none;
+	}
+
 	> p {
 		margin: 0;
 		padding-inline: var(--space-xs);
@@ -311,6 +315,7 @@ html {
 	outline: none;
 	box-shadow: var(--shadow-md);
 	overflow: auto;
+	overflow-inline: hidden;
 	font-family: var(--font-ui);
 	color-scheme: light;
 
@@ -327,6 +332,8 @@ html {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-sm);
+		min-inline-size: 0;
+		max-inline-size: 100%;
 	}
 
 	h2 {
@@ -391,7 +398,9 @@ html {
 			block-size: 1.25rem;
 			border-radius: var(--radius-pill);
 			background: var(--note-bg, var(--color-note));
-			box-shadow: inset 0 0 0 0.0625rem color-mix(in srgb, #000 16%, transparent);
+			box-shadow:
+				0 0 0 0.125rem var(--color-bg),
+				inset 0 0 0 0.0625rem color-mix(in srgb, #000 16%, transparent);
 			cursor: pointer;
 
 			&:has(:checked),
@@ -475,6 +484,7 @@ html {
 
 	menu {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: flex-end;
 		gap: var(--space-xs);
 		padding: 0;
