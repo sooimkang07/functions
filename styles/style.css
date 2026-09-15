@@ -3,7 +3,7 @@
 /* ---------------ROOT VARIABLES--------------- */
 
 :root {
-	--font-ui: "Inter", sans-serif;
+	--font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
 	--font-note: "Gaegu", sans-serif;
 
 	--fs-sm:  0.75rem;
@@ -23,32 +23,36 @@
 	--space-lg: 1.5rem;
 	--space-xl: 2rem;
 
-	--radius-sm: 6px;
-	--radius-md: 10px;
+	--radius-sm: 0.375rem;
+	--radius-md: 0.625rem;
+	--radius-pill: 100vmax;
 
 	--color-text: #272727;
 	--color-text-secondary: #474747;
 	--color-text-tertiary: #9A9FA6;
-	--color-bg: #ffffff;
-	--color-hover: #f2f2f2;
-	--color-border: #dadce0;
+	--color-bg: #f6f6f6;
+	--color-surface: #ffffff;
+	--color-hover: #ececec;
+	--color-border: #d8d8d8;
 	--color-note: #ffe992;
 	--color-note-hover: #fff5cd;
 	--color-note-accent: #e6c200;
 	--color-clear: #c0392b;
 
-	--border-ui: 1px solid var(--color-border);
+	--border-ui: 0.0625rem solid var(--color-border);
 
-	--shadow-sm: 0 1px 2px rgba(60,64,67,.10), 0 1px 3px rgba(60,64,67,.08);
-	--shadow-md: 0 2px 8px rgba(60,64,67,.12), 0 1px 3px rgba(60,64,67,.08);
+	--shadow-sm: 0 0.0625rem 0.125rem rgba(60,64,67,.10), 0 0.0625rem 0.1875rem rgba(60,64,67,.08);
+	--shadow-md: 0 0.125rem 0.5rem rgba(60,64,67,.12), 0 0.0625rem 0.1875rem rgba(60,64,67,.08);
 
 	--ease: cubic-bezier(.2,0,0,1);
 	--duration: 120ms;
 	--duration-md: 180ms;
+	--duration-coyote: var(--duration-md);
 
-	--popup-inline-size: 23rem;
+	--popup-inline-size: 100%;
 	--toggle-inline-size: 4rem;
 	--annotation-indent: calc(var(--space-sm) + 1rem + var(--space-xs));
+	--blur-toolbar: 1.25rem;
 }
 
 /* ---------------BODY--------------- */
@@ -80,6 +84,64 @@ body {
 	border-block-end: var(--border-ui);
 }
 
+.popup-onboard {
+	margin: 0;
+	padding: var(--space-md);
+	background: var(--color-surface);
+	border-block-end: var(--border-ui);
+
+	h2 {
+		margin: 0;
+		font-family: var(--font-note);
+		font-size: var(--fs-xl);
+		font-weight: var(--fw-semibold);
+	}
+
+	ol {
+		margin-block: var(--space-sm) var(--space-md);
+		margin-inline: 0;
+		padding-inline-start: var(--space-md);
+		list-style: decimal;
+		color: var(--color-text-secondary);
+
+		li {
+			margin-block: var(--space-xs);
+			padding-inline-start: var(--space-2xs);
+			font-size: var(--fs-regular);
+			line-height: 1.4;
+		}
+	}
+
+	button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-sm);
+		border: var(--border-ui);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text);
+		cursor: pointer;
+		font: var(--fw-medium) var(--fs-regular) var(--font-ui);
+		box-shadow: var(--shadow-sm);
+		transition:
+			background-color var(--duration) var(--ease),
+			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
+
+		&:hover {
+			background: var(--color-hover);
+			transition-delay: 0s;
+		}
+
+		&:focus-visible {
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: 0.125rem;
+		}
+	}
+}
+
 /* ---------------HEADER (LOGO, ANNOTATE BUTTON)--------------- */
 
 header {
@@ -89,6 +151,9 @@ header {
 	padding-inline: var(--space-sm);
 	padding-block: var(--space-xs);
 	border-block-end: var(--border-ui);
+	background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+	backdrop-filter: blur(var(--blur-toolbar));
+	-webkit-backdrop-filter: blur(var(--blur-toolbar));
 
 	img:not(button img) {
 		flex-shrink: 0;
@@ -110,12 +175,13 @@ header {
 		justify-content: center;
 		padding: var(--space-xs);
 		cursor: pointer;
-		border-radius: 1000px;
+		border-radius: var(--radius-pill);
 		background-color: transparent;
 		flex-shrink: 0;
 		transition:
-			background var(--duration) var(--ease),
+			background-color var(--duration) var(--ease),
 			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		svg {
 			inline-size: 1.125rem;
@@ -125,13 +191,14 @@ header {
 
 		&:hover {
 			background: var(--color-hover);
-			border-radius: 1000px;
+			border-radius: var(--radius-pill);
 			color: var(--color-text);
+			transition-delay: 0s;
 		}
 
 		&:focus-visible {
-			outline: 2px solid var(--color-note-accent);
-			outline-offset: 2px;
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: 0.125rem;
 		}
 	}
 }
@@ -149,6 +216,9 @@ header {
 		padding-block: var(--space-md);
 		padding-inline: var(--space-lg);
 		border: none;
+		background: transparent;
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 
 		h2 {
 			margin: 0;
@@ -161,18 +231,21 @@ header {
 			padding: 0;
 			border: none;
 			background: transparent;
+			box-shadow: none;
 			color: var(--color-text-tertiary);
 			cursor: pointer;
 			font: var(--fw-medium) var(--fs-regular) var(--font-ui);
 			transition: color var(--duration) var(--ease);
+			transition-delay: var(--duration-coyote);
 
 			&:hover {
 				color: var(--color-clear);
+				transition-delay: 0s;
 			}
 
 			&:focus-visible {
-				outline: 2px solid var(--color-note-accent);
-				outline-offset: 2px;
+				outline: 0.125rem solid var(--color-note-accent);
+				outline-offset: 0.125rem;
 			}
 		}
 	}
@@ -212,15 +285,17 @@ header {
 		font-size: var(--fs-regular);
 		font-weight: var(--fw-regular);
 		border-radius: var(--radius-sm);
-		transition: background var(--duration) var(--ease);
+		transition: background-color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		&:hover {
 			background: var(--color-hover);
+			transition-delay: 0s;
 		}
 
 		&:focus-visible {
-			outline: 2px solid var(--color-note-accent);
-			outline-offset: -2px;
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: -0.125rem;
 		}
 	}
 
@@ -258,8 +333,9 @@ header {
 		padding-inline: var(--space-sm);
 		color: var(--color-text-tertiary);
 		transition:
-			background var(--duration) var(--ease),
+			background-color var(--duration) var(--ease),
 			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		svg {
 			flex-shrink: 0;
@@ -305,16 +381,18 @@ header {
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		transition:
-			background var(--duration) var(--ease),
+			background-color var(--duration) var(--ease),
 			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		&:hover {
 			background: var(--color-hover);
+			transition-delay: 0s;
 		}
 
 		&:focus-visible {
-			outline: 2px solid var(--color-note-accent);
-			outline-offset: -2px;
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: -0.125rem;
 		}
 	}
 }
@@ -338,12 +416,13 @@ header {
 		--color-text-tertiary: #202124;
 		--color-border: #767676;
 		--color-hover: #e8eaed;
+		--color-bg: #ffffff;
 	}
 
 	header button,
 	.popup-page-button,
 	.popup-page-toggle,
 	.popup-annotation-item {
-		outline: 1px solid var(--color-border);
+		outline: 0.0625rem solid var(--color-border);
 	}
 }

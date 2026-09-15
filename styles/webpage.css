@@ -8,11 +8,14 @@ html {
 }
 
 :root {
-	--font-ui: "Inter", sans-serif;
+	--font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
 	--font-note: "Gaegu", sans-serif;
 
 	--fs-regular: 0.875rem;
+	--fs-note-md: 1.25rem;
 	--fs-note: 1.6rem;
+	--note-len: 0;
+	--note-len-max: 200;
 
 	--fw-medium: 500;
 
@@ -23,8 +26,8 @@ html {
 	--space-lg: 1.5rem;
 	--space-xl: 2rem;
 
-	--radius-sm: 6px;
-	--radius-md: 10px;
+	--radius-sm: 0.375rem;
+	--radius-md: 0.625rem;
 
 	--color-text: #272727;
 	--color-note: #ffe992;
@@ -33,23 +36,27 @@ html {
 	--color-bg: #ffffff;
 	--color-hover: #f2f2f2;
 	--color-border: #dadce0;
+	--color-scrim: color-mix(in srgb, #000 40%, transparent);
 
-	--border-ui: 1px solid var(--color-border);
+	--border-ui: 0.0625rem solid var(--color-border);
 
-	--shadow-sm: 0 1px 2px rgba(60,64,67,.10), 0 1px 3px rgba(60,64,67,.08);
-	--shadow-md: 0 2px 8px rgba(60,64,67,.12), 0 1px 3px rgba(60,64,67,.08);
+	--shadow-sm: 0 0.0625rem 0.125rem rgba(60,64,67,.10), 0 0.0625rem 0.1875rem rgba(60,64,67,.08);
+	--shadow-md: 0 0.125rem 0.5rem rgba(60,64,67,.12), 0 0.0625rem 0.1875rem rgba(60,64,67,.08);
 
-	--outline-annotating: 2px solid var(--color-note-accent);
+	--outline-annotating: 0.125rem solid var(--color-note-accent);
 	--lh-note: 1;
 	--lh-modal: 1.2;
 
 	--ease: cubic-bezier(.2,0,0,1);
 	--duration: 120ms;
 	--duration-md: 180ms;
+	--duration-coyote: var(--duration-md);
 
 	--inline-size-note: 18rem;
 	--inline-size-modal: 20rem;
+	--min-block-modal: 8rem;
 	--inline-offset-toolbar: 1rem;
+	--blur-toolbar: 1.25rem;
 
 	--layer-z: 1000;
 	--note-z: 1001;
@@ -60,7 +67,7 @@ html {
 
 html {
 	&.is-annotating {
-		*, *:hover {
+		*:not(html):not(body) {
 			cursor: pointer;
 		}
 
@@ -71,10 +78,29 @@ html {
 			cursor: default;
 		}
 
-		*:hover:not(.is-annotated):not(#notate-modal):not(#notate-modal *):not(.notate-note):not(.notate-note *):not(#notate-toolbar):not(#notate-toolbar *) {
-			outline: var(--outline-annotating);
-			outline-offset: 0.125rem;
-			border-radius: var(--radius-sm);
+		.notate-note,
+		.notate-note:hover {
+			cursor: grab;
+		}
+
+		.notate-note:active,
+		.notate-note:active * {
+			cursor: grabbing;
+		}
+
+		[data-action="edit"] {
+			display: none;
+		}
+	}
+
+	&.is-previewing {
+		.notate-note {
+			cursor: pointer;
+		}
+
+		.notate-hover,
+		#notate-img-overlay {
+			display: none;
 		}
 	}
 }
@@ -83,6 +109,13 @@ html {
 
 .notate-hover {
 	background-color: color-mix(in srgb, var(--color-note) 30%, transparent);
+	outline: var(--outline-annotating);
+	outline-color: var(--color-note-accent);
+	outline-offset: 0.125rem;
+	border-radius: var(--radius-sm);
+	transition:
+		background-color var(--duration-md) var(--ease),
+		outline-color var(--duration-md) var(--ease);
 }
 
 #notate-img-overlay {
@@ -90,6 +123,7 @@ html {
 	background: color-mix(in srgb, var(--color-note) 30%, transparent);
 	pointer-events: none;
 	z-index: var(--toolbar-z);
+	transition: opacity var(--duration-md) var(--ease);
 }
 
 /* ---------------TOOLBAR BUTTONS--------------- */
@@ -109,12 +143,28 @@ html {
 	inline-size: max-content;
 	max-inline-size: calc(100vw - (var(--space-md) * 2));
 	z-index: var(--toolbar-z);
+	color-scheme: light;
+	background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+	border: var(--border-ui);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+	backdrop-filter: blur(var(--blur-toolbar));
+	-webkit-backdrop-filter: blur(var(--blur-toolbar));
 
 	.notate-toolbar-group {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-xs);
+		margin: 0;
+		padding: 0;
+
+		li {
+			display: flex;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
 	}
 
 	.notate-toolbar-button {
@@ -130,14 +180,19 @@ html {
 		font-weight: var(--fw-medium);
 		line-height: 1.4;
 		white-space: nowrap;
+		transition:
+			background-color var(--duration) var(--ease),
+			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		&:hover {
 			background: var(--color-hover);
+			transition-delay: 0s;
 		}
 
 		&:focus-visible {
-			outline: 2px solid var(--color-note-accent);
-			outline-offset: 2px;
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: 0.125rem;
 		}
 	}
 }
@@ -159,9 +214,16 @@ html {
 	background: var(--color-note);
 	border: none;
 	outline: none;
+	box-shadow: var(--shadow-md);
+	font-family: var(--font-ui);
+	color-scheme: light;
 
 	&:not([open]) {
 		display: none;
+	}
+
+	&::backdrop {
+		background: var(--color-scrim);
 	}
 
 	form {
@@ -176,13 +238,17 @@ html {
 		inline-size: 100%;
 		max-inline-size: 100%;
 		min-inline-size: 0;
-		min-block-size: 8rem;
+		min-block-size: var(--min-block-modal);
 		padding: var(--space-xs);
 		box-sizing: border-box;
 		resize: none;
 		background: transparent;
 		font-family: var(--font-note);
-		font-size: var(--fs-note);
+		font-size: clamp(
+			var(--fs-regular),
+			calc(var(--fs-note) - ((var(--fs-note) - var(--fs-regular)) * min(var(--note-len) / var(--note-len-max), 1))),
+			var(--fs-note)
+		);
 		line-height: var(--lh-modal);
 		color: var(--color-text);
 		border: none;
@@ -227,14 +293,19 @@ html {
 		font-size: var(--fs-regular);
 		font-weight: var(--fw-medium);
 		line-height: 1.4;
+		transition:
+			background-color var(--duration) var(--ease),
+			color var(--duration) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		&:hover {
 			background: var(--color-hover);
+			transition-delay: 0s;
 		}
 
 		&:focus-visible {
-			outline: 2px solid var(--color-note-accent);
-			outline-offset: 2px;
+			outline: 0.125rem solid var(--color-note-accent);
+			outline-offset: 0.125rem;
 		}
 	}
 }
@@ -268,16 +339,24 @@ html {
 	word-break: break-word;
 	border: none;
 	outline: none;
+	box-shadow: var(--shadow-sm);
+	transition: background-color var(--duration) var(--ease);
+	transition-delay: var(--duration-coyote);
 
 	&:hover {
 		background: var(--color-note-hover);
+		transition-delay: 0s;
 	}
 
 	p {
 		margin: 0;
-		padding-inline-end: 1.5rem;
+		padding-inline-end: var(--space-lg);
 		font-family: var(--font-note);
-		font-size: var(--fs-note);
+		font-size: clamp(
+			var(--fs-regular),
+			calc(var(--fs-note) - ((var(--fs-note) - var(--fs-regular)) * min(var(--note-len) / var(--note-len-max), 1))),
+			var(--fs-note)
+		);
 		line-height: var(--lh-note);
 		color: var(--color-text);
 		overflow-wrap: anywhere;
@@ -297,14 +376,18 @@ html {
 		border: none;
 		outline: none;
 		opacity: 0;
+		transition: opacity var(--duration-md) var(--ease);
+		transition-delay: var(--duration-coyote);
 
 		&:hover {
 			opacity: 1;
+			transition-delay: 0s;
 		}
 	}
 
 	&:hover .notate-delete {
 		opacity: 0.5;
+		transition-delay: 0s;
 	}
 }
 
@@ -327,12 +410,13 @@ html {
 
 @media (prefers-contrast: more) {
 	:root {
-		--outline-annotating: 3px solid #b8860b;
+		--outline-annotating: 0.1875rem solid #b8860b;
 		--color-note-accent: #b8860b;
+		--color-scrim: color-mix(in srgb, #000 60%, transparent);
 	}
 
 	.notate-toolbar-button,
 	#notate-modal button {
-		outline: 1px solid var(--color-border);
+		outline: 0.0625rem solid var(--color-border);
 	}
 }
