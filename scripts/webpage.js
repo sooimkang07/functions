@@ -197,13 +197,13 @@ const syncModalCopy = () => {
 	const hint = modal.querySelector('form > p')
 
 	if (heading) {
-		heading.textContent = editingAnnotationId ? 'Edit this note' : 'What caught your attention?'
+		heading.textContent = editingAnnotationId ? 'Edit note' : 'New note'
 	}
 
 	if (hint) {
 		hint.textContent = editingAnnotationId
 			? 'Update why this mattered.'
-			: 'Write why it mattered. This note stays on this element.'
+			: 'Write why it mattered.'
 	}
 }
 
@@ -236,14 +236,22 @@ const syncModalFields = (annotation) => {
 }
 
 const readModalMeta = () => {
+	const current = editingAnnotationId ? getAnnotationById(editingAnnotationId) : null
+
 	return {
 		text: textarea.value.trim(),
-		color: notateNormalizeColor(form.querySelector('[name="annotation-color"]:checked')?.value),
-		group: notateNormalizeGroup(form.querySelector('[name="annotation-group"]')?.value),
+		color: notateNormalizeColor(
+			form.querySelector('[name="annotation-color"]:checked')?.value || current?.color
+		),
+		group: notateNormalizeGroup(
+			form.querySelector('[name="annotation-group"]')?.value ?? current?.group ?? ''
+		),
 		interaction: notateNormalizeInteraction({
-			kind: form.querySelector('[name="annotation-state"]:checked')?.value,
-			cursor: pendingInteraction?.cursor || notateReadCursor(activeTarget),
-			scrollY: pendingInteraction?.scrollY ?? Math.round(window.scrollY)
+			kind: form.querySelector('[name="annotation-state"]:checked')?.value
+				|| current?.interaction?.kind
+				|| pendingInteraction?.kind,
+			cursor: pendingInteraction?.cursor || current?.interaction?.cursor || notateReadCursor(activeTarget),
+			scrollY: pendingInteraction?.scrollY ?? current?.interaction?.scrollY ?? Math.round(window.scrollY)
 		}, activeTarget)
 	}
 }
@@ -324,7 +332,7 @@ const createToolbar = () => {
 			<menu class="notate-toolbar-group">
 				<li>
 					<button class="notate-toolbar-button" type="button" data-action="edit">
-						Add
+						New
 					</button>
 				</li>
 				<li>
@@ -337,8 +345,6 @@ const createToolbar = () => {
 						Reposition
 					</button>
 				</li>
-			</menu>
-			<menu class="notate-toolbar-group">
 				<li>
 					<button class="notate-toolbar-button" type="button" data-action="clear">
 						Clear
@@ -346,7 +352,7 @@ const createToolbar = () => {
 				</li>
 				<li>
 					<button class="notate-toolbar-button" type="button" data-action="exit">
-						Hide
+						Done
 					</button>
 				</li>
 			</menu>
@@ -369,22 +375,20 @@ const refreshToolbar = () => {
 	const status = toolbar.querySelector(':scope > p')
 	if (status) {
 		if (isMoving) {
-			status.textContent = 'Drag a note to move it.'
+			status.textContent = 'Drag to move'
 		} else if (isAnnotating) {
-			status.textContent = 'Click what caught your eye.'
-		} else if (isPreviewing) {
-			status.textContent = 'Your notes on this page.'
+			status.textContent = 'Click to mark'
 		} else {
 			status.textContent = ''
 		}
 	}
 
 	const labels = {
-		preview: isPreviewing ? 'Review' : 'Done',
-		edit: 'Add',
+		preview: 'Done',
+		edit: 'New',
 		move: 'Reposition',
 		clear: 'Clear',
-		exit: 'Hide'
+		exit: 'Done'
 	}
 
 	toolbar.querySelectorAll('[data-action]').forEach((button) => {
@@ -425,37 +429,13 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<h2>What caught your attention?</h2>
-			<p>Write why it mattered. This note stays on this element.</p>
-			<textarea id="annotation-text" name="annotation-text" placeholder="Why did this matter?"></textarea>
-			<label>
-				Group (optional)
-				<input name="annotation-group" list="notate-groups" autocomplete="off">
-			</label>
-			<datalist id="notate-groups"></datalist>
-			<fieldset>
-				<legend>Color</legend>
-				${NOTATE_COLORS.map((color) => `
-					<label data-color="${color}">
-						<input type="radio" name="annotation-color" value="${color}">
-					</label>
-				`).join('')}
-			</fieldset>
-			<fieldset>
-				<legend>When you saw this</legend>
-				${NOTATE_STATES.map((state) => `
-					<label>
-						<input type="radio" name="annotation-state" value="${state}">
-						${notateStateLabel(state)}
-					</label>
-				`).join('')}
-			</fieldset>
+			<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
 			<menu>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
-					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save note <kbd>⌘↩</kbd></button>
+					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save</button>
 				</li>
 			</menu>
 		</form>
