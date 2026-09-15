@@ -108,8 +108,15 @@ const saveAnnotations = async () => {
 const loadAnnotations = async () => {
 	const storedAnnotations = await getStoredAnnotations()
 	const pageData = findStoredPage(storedAnnotations, location.href)
+	const colors = await getGroupColors()
 
-	annotations = (pageData?.annotations || []).map(notateNormalizeAnnotation)
+	annotations = (pageData?.annotations || []).map((annotation) => {
+		const normalized = notateNormalizeAnnotation(annotation)
+		return {
+			...normalized,
+			color: notateResolveGroupColor(normalized.group, colors, normalized.color)
+		}
+	})
 }
 
 // remove this page's saved record completely when it no longer has any annotations
@@ -219,18 +226,85 @@ const fillGroupOptions = async () => {
 	}).join('')
 }
 
-const syncModalFields = (annotation) => {
+const getGroupColors = async () => {
+	const stored = await extensionStorageGet(NOTATE_GROUP_COLORS_KEY)
+	return stored[NOTATE_GROUP_COLORS_KEY] || {}
+}
+
+const persistGroupColor = async (group, color) => {
+	const name = notateNormalizeGroup(group)
+	if (!name) return notateNormalizeColor(color)
+
+	const nextColor = notateNormalizeColor(color)
+	const colors = await getGroupColors()
+	colors[name] = nextColor
+	await extensionStorageSet({ [NOTATE_GROUP_COLORS_KEY]: colors })
+
+	const stored = await getStoredAnnotations()
+	const pageKey = getPageKey(stored)
+
+	Object.entries(stored).forEach(([key, page]) => {
+		if (key === pageKey) return
+		;(page.annotations || []).forEach((annotation) => {
+			if (notateNormalizeGroup(annotation.group) === name) {
+				annotation.color = nextColor
+			}
+		})
+	})
+
+	await extensionStorageSet({ [storageKey]: stored })
+	return nextColor
+}
+
+const syncLocalGroupColor = (group, color) => {
+	const name = notateNormalizeGroup(group)
+	if (!name) return
+
+	const nextColor = notateNormalizeColor(color)
+
+	annotations.forEach((annotation) => {
+		if (notateNormalizeGroup(annotation.group) === name) {
+			annotation.color = nextColor
+		}
+	})
+
+	document.querySelectorAll('.notate-note').forEach((note) => {
+		const annotation = getAnnotationById(note.dataset.id)
+		if (annotation && notateNormalizeGroup(annotation.group) === name) {
+			note.dataset.color = nextColor
+		}
+	})
+}
+
+const syncGroupColorFromName = async () => {
+	const groupInput = form?.querySelector('[name="annotation-group"]')
+	const name = notateNormalizeGroup(groupInput?.value)
+	if (!name || !form) return
+
+	const colors = await getGroupColors()
+	const color = colors[name]
+	if (!color) return
+
+	form.querySelectorAll('[name="annotation-color"]').forEach((input) => {
+		input.checked = input.value === color
+	})
+	if (modal) modal.dataset.color = notateNormalizeColor(color)
+}
+
+const syncModalFields = async (annotation) => {
 	fillGroupOptions()
 
-	const color = notateNormalizeColor(annotation?.color)
+	const groupInput = form.querySelector('[name="annotation-group"]')
+	if (groupInput) groupInput.value = annotation?.group || ''
+
+	const colors = await getGroupColors()
+	const groupName = notateNormalizeGroup(groupInput?.value)
+	const color = notateResolveGroupColor(groupName, colors, annotation?.color)
 	modal.dataset.color = color
 
 	form.querySelectorAll('[name="annotation-color"]').forEach((input) => {
 		input.checked = input.value === color
 	})
-
-	const groupInput = form.querySelector('[name="annotation-group"]')
-	if (groupInput) groupInput.value = annotation?.group || ''
 
 	const interaction = notateNormalizeInteraction(annotation?.interaction || pendingInteraction || {}, activeTarget)
 	form.querySelectorAll('[name="annotation-state"]').forEach((input) => {
@@ -438,6 +512,27 @@ const createModal = () => {
 				<input name="annotation-group" list="notate-groups" placeholder="Across every page" autocomplete="off">
 			</label>
 			<datalist id="notate-groups"></datalist>
+			<fieldset>
+				<legend>Color</legend>
+				<label data-color="yellow">
+					<input type="radio" name="annotation-color" value="yellow" aria-label="Yellow" checked>
+				</label>
+				<label data-color="mint">
+					<input type="radio" name="annotation-color" value="mint" aria-label="Mint">
+				</label>
+				<label data-color="sky">
+					<input type="radio" name="annotation-color" value="sky" aria-label="Sky">
+				</label>
+				<label data-color="peach">
+					<input type="radio" name="annotation-color" value="peach" aria-label="Peach">
+				</label>
+				<label data-color="lilac">
+					<input type="radio" name="annotation-color" value="lilac" aria-label="Lilac">
+				</label>
+				<label data-color="rose">
+					<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
+				</label>
+			</fieldset>
 			<menu>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
@@ -458,6 +553,9 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 	textarea.addEventListener('input', () => {
 		scaleNoteType(textarea.value, textarea)
+	})
+	form.querySelector('[name="annotation-group"]')?.addEventListener('input', () => {
+		syncGroupColorFromName()
 	})
 	modal.addEventListener('change', (event) => {
 		if (event.target.name !== 'annotation-color') return
@@ -679,6 +777,7 @@ const createAnnotation = async (text, color, group, interaction) => {
 		group,
 		offsetInline: 0,
 		offsetBlock: 0,
+		createdAt: Date.now(),
 		interaction: notateNormalizeInteraction(interaction || pendingInteraction, activeTarget)
 	})
 
@@ -827,6 +926,11 @@ const saveFromModal = async () => {
 	if (!text) {
 		closeModal()
 		return
+	}
+
+	if (group) {
+		syncLocalGroupColor(group, color)
+		await persistGroupColor(group, color)
 	}
 
 	if (editingAnnotationId) {

@@ -11,10 +11,10 @@ Use a copy that stays on this Mac:
 1. Open Terminal in this project folder and run:
    `chmod +x copy-to-local.sh && ./copy-to-local.sh`
 2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
-3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.7**.
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.8**.
 4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **side panel** that stays open while you scroll and switch pages.
 5. **New** only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be marked. Open a website first, or click a saved page in the side panel.
-6. How it works: **New** → click the element that caught your eye → write why it mattered → optionally add a **Group** (shared across every site) → Save (⌘↩). The library defaults to **Groups** so notes from different sites sit together. Switch to **Pages** to browse by site. **Done** finishes adding, or puts Notate away. Drag a note to move it while adding.
+6. How it works: **New** → click the element that caught your eye → write why it mattered → optionally name a **Group** and pick a **Color** for that group → Save (⌘↩). The library opens on **All** (newest notes first). Scroll the tabs at the top to filter by group. **Done** finishes adding, or puts Notate away. Drag a note to move it while adding.
 7. If the toolbar/popup N icon is missing, the PNGs in `images/` are still iCloud cloud-only files. Right-click `images` → **Download Now** / **Keep Downloaded**, or load from `~/notate-extension`. Click **Clear all** on the Errors page — Chrome keeps old errors after Reload.
 
 If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.

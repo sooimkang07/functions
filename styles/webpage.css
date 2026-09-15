@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Gaegu&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 /* ---------------ROOT VARIABLES--------------- */
 
@@ -9,12 +9,12 @@ html {
 
 :root {
 	--font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
-	--font-note: "Gaegu", sans-serif;
+	--font-note: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
 	--fs-sm: 0.75rem;
 	--fs-regular: 0.875rem;
 	--fs-note-md: 1rem;
-	--fs-note: 1.35rem;
+	--fs-note: 1rem;
 	--note-len: 0;
 	--note-len-max: 200;
 
@@ -59,7 +59,7 @@ html {
 	--shadow-md: 0 0.875rem 1.75rem rgba(15, 15, 15, 0.12), 0 0 0 0.0625rem rgba(15, 15, 15, 0.05);
 
 	--outline-annotating: 0.125rem solid var(--color-note-accent);
-	--lh-note: 1.15;
+	--lh-note: 1.4;
 	--lh-modal: 1.5;
 
 	--ease: cubic-bezier(.25,.1,.25,1);
@@ -499,7 +499,7 @@ html {
 		box-sizing: border-box;
 		resize: none;
 		background: transparent;
-		font-family: var(--font-ui);
+		font-family: var(--font-note);
 		font-size: var(--fs-regular);
 		line-height: var(--lh-modal);
 		color: var(--color-text);

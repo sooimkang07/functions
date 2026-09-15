@@ -4,6 +4,8 @@
 	globalThis.NOTATE_COLORS = ['yellow', 'mint', 'sky', 'peach', 'lilac', 'rose']
 	globalThis.NOTATE_COLOR_DEFAULT = 'yellow'
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
+	globalThis.NOTATE_GROUP_COLORS_KEY = 'notate-group-colors'
+	globalThis.NOTATE_LIBRARY_GROUP_KEY = 'notate-library-group'
 	globalThis.NOTATE_STATES = ['default', 'hover', 'active', 'focus', 'scroll', 'cursor']
 	globalThis.NOTATE_STATE_DEFAULT = 'default'
 	globalThis.NOTATE_STATE_LABELS = {
@@ -76,8 +78,38 @@
 		group: globalThis.notateNormalizeGroup(annotation.group),
 		offsetInline: annotation.offsetInline || 0,
 		offsetBlock: annotation.offsetBlock || 0,
+		createdAt: Number.isFinite(Number(annotation.createdAt)) && Number(annotation.createdAt) > 0
+			? Math.round(Number(annotation.createdAt))
+			: 0,
 		interaction: globalThis.notateNormalizeInteraction(annotation.interaction)
 	})
+
+	globalThis.notateNoteTime = (annotation = {}) => {
+		const created = Number(annotation.createdAt)
+		if (Number.isFinite(created) && created > 0) return created
+
+		const pageTime = Number(annotation.page?.updatedAt)
+		if (Number.isFinite(pageTime) && pageTime > 0) return pageTime
+
+		return 0
+	}
+
+	globalThis.notateResolveGroupColor = (group, colors = {}, fallback) => {
+		const name = globalThis.notateNormalizeGroup(group)
+		if (name && colors[name]) return globalThis.notateNormalizeColor(colors[name])
+		return globalThis.notateNormalizeColor(fallback)
+	}
+
+	globalThis.notateResolveGroupColors = (grouped = [], colors = {}) => {
+		const resolved = { ...colors }
+
+		grouped.forEach(([name, items]) => {
+			if (!name || name === globalThis.NOTATE_UNGROUPED || resolved[name]) return
+			resolved[name] = globalThis.notateNormalizeColor(items[0]?.color)
+		})
+
+		return resolved
+	}
 
 	globalThis.notateGroupKey = (group) => {
 		return globalThis.notateNormalizeGroup(group) || globalThis.NOTATE_UNGROUPED
@@ -112,15 +144,19 @@
 
 	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
 		return Object.values(storedAnnotations)
-			.sort((pageA, pageB) => (pageB.updatedAt || 0) - (pageA.updatedAt || 0))
 			.flatMap((page) => {
 				return [...(page.annotations || [])]
 					.map(globalThis.notateNormalizeAnnotation)
-					.reverse()
-					.map((annotation) => ({
+					.map((annotation, index) => ({
 						...annotation,
-						page
+						page,
+						sourceIndex: index
 					}))
+			})
+			.sort((left, right) => {
+				const time = globalThis.notateNoteTime(right) - globalThis.notateNoteTime(left)
+				if (time) return time
+				return (right.sourceIndex || 0) - (left.sourceIndex || 0)
 			})
 	}
 
