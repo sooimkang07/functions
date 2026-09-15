@@ -273,6 +273,7 @@ const createGroupItem = (name, items, open = true) => {
 const libraryViewKey = 'notate-library-view'
 const libraryGroupKey = NOTATE_LIBRARY_GROUP_KEY
 const groupColorsKey = NOTATE_GROUP_COLORS_KEY
+const groupOrderKey = NOTATE_GROUP_ORDER_KEY
 
 const getLibraryView = async () => {
 	const stored = await extensionStorageGet(libraryViewKey)
@@ -319,33 +320,119 @@ const getGroupColors = async () => {
 	return stored[groupColorsKey] || {}
 }
 
+const getGroupOrder = async () => {
+	const stored = await extensionStorageGet(groupOrderKey)
+	const order = stored[groupOrderKey]
+	return Array.isArray(order)
+		? order.map((name) => notateNormalizeGroup(name)).filter(Boolean)
+		: []
+}
+
+const setGroupOrder = async (order) => {
+	await extensionStorageSet({
+		[groupOrderKey]: notateOrderGroupNames(order, order)
+	})
+}
+
 const hideGroupTabs = () => {
 	const nav = document.querySelector('.popup-group-tabs')
 	if (nav) nav.hidden = true
 }
 
-const renderGroupTabs = (grouped, selected, colors) => {
+const clearGroupTabDropState = (menu) => {
+	menu?.querySelectorAll('.is-drop-before, .is-drop-after, .is-dragging').forEach((item) => {
+		item.classList.remove('is-drop-before', 'is-drop-after', 'is-dragging')
+	})
+}
+
+const bindGroupTabDrag = (menu, names) => {
+	let dragging = ''
+	let didDrag = false
+
+	menu.addEventListener('dragstart', (event) => {
+		const item = event.target.closest('li[draggable="true"]')
+		if (!item || !event.dataTransfer) return
+
+		dragging = item.dataset.group || ''
+		didDrag = false
+		event.dataTransfer.effectAllowed = 'move'
+		event.dataTransfer.setData('text/plain', dragging)
+		item.classList.add('is-dragging')
+	})
+
+	menu.addEventListener('dragover', (event) => {
+		const item = event.target.closest('li')
+		if (!item || !dragging) return
+
+		event.preventDefault()
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+		didDrag = true
+		clearGroupTabDropState(menu)
+		menu.querySelector(`li[data-group="${CSS.escape(dragging)}"]`)?.classList.add('is-dragging')
+
+		const rect = item.getBoundingClientRect()
+		const after = event.clientX > rect.left + rect.width / 2
+		item.classList.add(after ? 'is-drop-after' : 'is-drop-before')
+	})
+
+	menu.addEventListener('dragleave', (event) => {
+		if (menu.contains(event.relatedTarget)) return
+		clearGroupTabDropState(menu)
+		menu.querySelector(`li[data-group="${CSS.escape(dragging)}"]`)?.classList.add('is-dragging')
+	})
+
+	menu.addEventListener('drop', async (event) => {
+		event.preventDefault()
+		const item = event.target.closest('li')
+		const from = event.dataTransfer?.getData('text/plain') || dragging
+		clearGroupTabDropState(menu)
+		if (!item || !from) return
+
+		const to = item.dataset.group || ''
+		const rect = item.getBoundingClientRect()
+		const after = event.clientX > rect.left + rect.width / 2
+		const next = notateMoveGroupName(names, from, to, after)
+		dragging = ''
+		didDrag = true
+		await setGroupOrder(next)
+		renderAnnotatedPages()
+	})
+
+	menu.addEventListener('dragend', () => {
+		clearGroupTabDropState(menu)
+		dragging = ''
+	})
+
+	menu.addEventListener('click', (event) => {
+		if (!didDrag) return
+		event.preventDefault()
+		event.stopPropagation()
+		didDrag = false
+	}, true)
+}
+
+const renderGroupTabs = (grouped, selected, colors, order = []) => {
 	const nav = document.querySelector('.popup-group-tabs')
 	const menu = document.querySelector('#group-tabs')
 	if (!nav || !menu) return
 
-	const tabs = [
-		['', 'All'],
-		...grouped
-			.filter(([name]) => name !== NOTATE_UNGROUPED)
-			.map(([name]) => [name, name])
-	]
+	const named = grouped
+		.map(([name]) => name)
+		.filter((name) => name && name !== NOTATE_UNGROUPED)
+	const ordered = notateOrderGroupNames(named, order)
+	const tabs = [['', 'All'], ...ordered.map((name) => [name, name])]
 	const scroll = nav.scrollLeft
 
 	menu.innerHTML = tabs.map(([value, label]) => {
-		const color = value && value !== NOTATE_UNGROUPED
+		const color = value
 			? notateResolveGroupColor(value, colors)
 			: ''
 		const colorAttr = color ? ` data-color="${escapeHtml(color)}"` : ''
 		const isSelected = value === selected
+		const dragAttr = value ? ' draggable="true"' : ''
 
 		return `
-			<li>
+			<li data-group="${escapeHtml(value)}"${dragAttr}>
 				<button type="button" data-action="view-group" data-group="${escapeHtml(value)}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
 			</li>
 		`
@@ -364,6 +451,8 @@ const renderGroupTabs = (grouped, selected, colors) => {
 			renderAnnotatedPages()
 		})
 	})
+
+	bindGroupTabDrag(menu, ordered)
 }
 
 // fallback state if nothing has been saved yet
@@ -503,7 +592,7 @@ const renderAnnotatedPages = async () => {
 		return
 	}
 
-	renderGroupTabs(grouped, selected, colors)
+	renderGroupTabs(grouped, selected, colors, await getGroupOrder())
 
 	const visible = selected
 		? notes.filter((note) => notateGroupKey(note.group) === selected)
@@ -614,7 +703,7 @@ const initPopup = () => {
 	})
 
 	chrome.storage?.onChanged?.addListener((changes) => {
-		if (changes[storageKey] || changes[libraryViewKey] || changes[libraryGroupKey] || changes[groupColorsKey]) {
+		if (changes[storageKey] || changes[libraryViewKey] || changes[libraryGroupKey] || changes[groupColorsKey] || changes[groupOrderKey]) {
 			renderAnnotatedPages()
 		}
 	})
