@@ -184,7 +184,7 @@ const getSortedPages = (storedAnnotations) => {
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
 // each annotation is a clickable button with its selector saved in data-selector so I can scroll right to it
 // reversed so the most recently added annotation shows up at the top of the dropdown: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse
-const createAnnotationButton = (page, annotation, showPage = false) => {
+const createAnnotationButton = (page, annotation, showPage = false, color = annotation.color) => {
 	let pageLabel = page.title || page.url
 	try {
 		pageLabel = new URL(page.url).hostname.replace(/^www\./, '')
@@ -197,7 +197,7 @@ const createAnnotationButton = (page, annotation, showPage = false) => {
 
 	return `
 		<li>
-			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(annotation.color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
+			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
 		</li>
 	`
 }
@@ -267,6 +267,8 @@ const createGroupItem = (name, items, open = true) => {
 }
 
 const libraryViewKey = 'notate-library-view'
+const libraryGroupKey = NOTATE_LIBRARY_GROUP_KEY
+const groupColorsKey = NOTATE_GROUP_COLORS_KEY
 
 const getLibraryView = async () => {
 	const stored = await extensionStorageGet(libraryViewKey)
@@ -297,9 +299,68 @@ const createGroupsLibrary = (storedAnnotations) => {
 	}).join('')
 }
 
+const getLibraryGroup = async () => {
+	const stored = await extensionStorageGet(libraryGroupKey)
+	return String(stored[libraryGroupKey] || '')
+}
+
+const setLibraryGroup = async (group) => {
+	await extensionStorageSet({
+		[libraryGroupKey]: String(group || '')
+	})
+}
+
+const getGroupColors = async () => {
+	const stored = await extensionStorageGet(groupColorsKey)
+	return stored[groupColorsKey] || {}
+}
+
+const hideGroupTabs = () => {
+	const nav = document.querySelector('.popup-group-tabs')
+	if (nav) nav.hidden = true
+}
+
+const renderGroupTabs = (grouped, selected, colors) => {
+	const nav = document.querySelector('.popup-group-tabs')
+	const menu = document.querySelector('#group-tabs')
+	if (!nav || !menu) return
+
+	const tabs = [['', 'All'], ...grouped.map(([name]) => [name, name])]
+	const scroll = nav.scrollLeft
+
+	menu.innerHTML = tabs.map(([value, label]) => {
+		const color = value && value !== NOTATE_UNGROUPED
+			? notateResolveGroupColor(value, colors)
+			: ''
+		const colorAttr = color ? ` data-color="${escapeHtml(color)}"` : ''
+		const isSelected = value === selected
+
+		return `
+			<li>
+				<button type="button" data-action="view-group" data-group="${escapeHtml(value)}" aria-selected="${isSelected ? 'true' : 'false'}"${colorAttr}>${escapeHtml(label)}</button>
+			</li>
+		`
+	}).join('')
+
+	nav.hidden = false
+	nav.scrollLeft = scroll
+	menu.querySelector('[data-action="view-group"][aria-selected="true"]')?.scrollIntoView({
+		inline: 'nearest',
+		block: 'nearest'
+	})
+
+	menu.querySelectorAll('[data-action="view-group"]').forEach((button) => {
+		button.addEventListener('click', async () => {
+			await setLibraryGroup(button.dataset.group || '')
+			renderAnnotatedPages()
+		})
+	})
+}
+
 // fallback state if nothing has been saved yet
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 const renderEmptyState = () => {
+	hideGroupTabs()
 	list.innerHTML = `
 		<li class="popup-empty-state">
 			<h2>No notes yet</h2>
@@ -413,23 +474,42 @@ const bindPageButtons = () => {
 const renderAnnotatedPages = async () => {
 	const storedAnnotations = await getStoredAnnotations()
 	const pages = getSortedPages(storedAnnotations)
-	const tab = await getActiveTab()
-	const currentUrl = tab?.url || ''
-	const view = await getLibraryView()
+	const notes = notateFlattenNotes(storedAnnotations)
+	const grouped = notateGroupedAnnotations(notes)
+	const groupNames = new Set(grouped.map(([name]) => name))
+	const colors = notateResolveGroupColors(grouped, await getGroupColors())
+	let selected = await getLibraryGroup()
 
-	syncLibraryViewButtons(view)
+	if (selected && !groupNames.has(selected)) {
+		selected = ''
+		await setLibraryGroup('')
+	}
 
 	if (!pages.length) {
 		renderEmptyState()
 		return
 	}
 
-	list.innerHTML = view === 'pages'
-		? pages.map((page) => createPageItem({
-			...page,
-			isCurrent: Boolean(currentUrl) && pageUrlsMatch(page.url, currentUrl)
-		})).join('')
-		: createGroupsLibrary(storedAnnotations)
+	renderGroupTabs(grouped, selected, colors)
+
+	const visible = selected
+		? notes.filter((note) => notateGroupKey(note.group) === selected)
+		: notes
+
+	if (!visible.length) {
+		list.innerHTML = `
+			<li class="popup-empty-state">
+				<h2>No notes in this group</h2>
+				<p>Switch tabs, or add a note to this group.</p>
+			</li>
+		`
+		return
+	}
+
+	list.innerHTML = visible.map((item) => {
+		const color = notateResolveGroupColor(item.group, colors, item.color)
+		return createAnnotationButton(item.page, item, true, color)
+	}).join('')
 	bindPageButtons()
 }
 
@@ -521,7 +601,9 @@ const initPopup = () => {
 	})
 
 	chrome.storage?.onChanged?.addListener((changes) => {
-		if (changes[storageKey] || changes[libraryViewKey]) renderAnnotatedPages()
+		if (changes[storageKey] || changes[libraryViewKey] || changes[libraryGroupKey] || changes[groupColorsKey]) {
+			renderAnnotatedPages()
+		}
 	})
 
 	chrome.tabs?.onActivated?.addListener(() => {
