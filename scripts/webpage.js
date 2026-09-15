@@ -163,6 +163,7 @@ const placeModalNear = (element) => {
 		modal.style.insetBlockStart = '50%'
 		modal.style.insetInlineStart = '50%'
 		modal.style.translate = '-50% -50%'
+		requestAnimationFrame(clampModalToViewport)
 		return
 	}
 
@@ -186,6 +187,23 @@ const placeModalNear = (element) => {
 
 	modal.style.insetBlockStart = `${Math.round(insetBlock / rem)}rem`
 	modal.style.insetInlineStart = `${Math.round(insetInline / rem)}rem`
+	modal.style.translate = '0'
+	requestAnimationFrame(clampModalToViewport)
+}
+
+const clampModalToViewport = () => {
+	if (!modal?.open) return
+
+	const rem = remToPx()
+	const gap = rem / 2
+	const rect = modal.getBoundingClientRect()
+	const maxInline = Math.max(gap, window.innerWidth - rect.width - gap)
+	const maxBlock = Math.max(gap, window.innerHeight - rect.height - gap)
+	const inline = Math.min(Math.max(rect.left, gap), maxInline)
+	const block = Math.min(Math.max(rect.top, gap), maxBlock)
+
+	modal.style.insetInlineStart = `${Math.round(inline / rem)}rem`
+	modal.style.insetBlockStart = `${Math.round(block / rem)}rem`
 	modal.style.translate = '0'
 }
 
@@ -596,7 +614,7 @@ const createModal = () => {
 	modal.innerHTML = `
 		<form method="dialog">
 			<section data-screen="note">
-				<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
+				<textarea id="annotation-text" name="annotation-text" aria-label="New note" placeholder="New note"></textarea>
 				<label>
 					Group
 					<select name="annotation-group-choice" aria-label="Choose a group">
@@ -781,6 +799,14 @@ const getNotePosition = (target, selector, annotationId) => {
 	const annotation = getAnnotationById(annotationId)
 	left += annotation?.offsetInline || 0
 	top += annotation?.offsetBlock || 0
+
+	const maxNoteWidth = Math.min(noteWidth, window.innerWidth - gap * 2)
+	if (left + maxNoteWidth > viewportRight - gap) {
+		left = viewportRight - maxNoteWidth - gap
+	}
+	if (left < viewportLeft + gap) {
+		left = viewportLeft + gap
+	}
 
 	return { top, left }
 }
