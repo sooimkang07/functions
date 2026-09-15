@@ -59,6 +59,7 @@ let isMoving = false
 let noteDrag = null
 let noteDidDrag = false
 let pendingInteraction = null
+let pendingGroup = ''
 let lastPointerTarget = null
 let lastPointerX = 0
 let lastPointerY = 0
@@ -214,16 +215,50 @@ const syncModalCopy = () => {
 	}
 }
 
-const fillGroupOptions = async () => {
-	const list = modal?.querySelector('#notate-groups')
-	if (!list) return
+const readChosenGroup = () => {
+	const choice = form?.querySelector('[name="annotation-group-choice"]')?.value ?? ''
+	const typed = notateNormalizeGroup(form?.querySelector('[name="annotation-group"]')?.value ?? '')
+
+	if (choice === NOTATE_NEW_GROUP) return typed
+	return notateNormalizeGroup(choice)
+}
+
+const syncGroupNameField = () => {
+	const select = form?.querySelector('[name="annotation-group-choice"]')
+	const nameField = form?.querySelector('[data-group-name]')
+	if (nameField) nameField.hidden = select?.value !== NOTATE_NEW_GROUP
+}
+
+const fillGroupOptions = async (preferred = '') => {
+	const select = form?.querySelector('[name="annotation-group-choice"]')
+	const nameInput = form?.querySelector('[name="annotation-group"]')
+	if (!select) return
 
 	const stored = await getStoredAnnotations()
-	const all = Object.values(stored).flatMap((page) => page.annotations || [])
+	const colors = await getGroupColors()
+	const names = notateCollectGroupNames(stored, colors)
+	const preferredName = notateNormalizeGroup(preferred)
 
-	list.innerHTML = notateUniqueGroups(all).map((group) => {
-		return `<option value="${notateEscapeHtml(group)}"></option>`
-	}).join('')
+	select.innerHTML = [
+		'<option value="">No group</option>',
+		...names.map((name) => {
+			return `<option value="${notateEscapeHtml(name)}">${notateEscapeHtml(name)}</option>`
+		}),
+		`<option value="${NOTATE_NEW_GROUP}">New group</option>`
+	].join('')
+
+	if (preferredName && names.includes(preferredName)) {
+		select.value = preferredName
+		if (nameInput) nameInput.value = preferredName
+	} else if (preferredName) {
+		select.value = NOTATE_NEW_GROUP
+		if (nameInput) nameInput.value = preferredName
+	} else {
+		select.value = ''
+		if (nameInput) nameInput.value = ''
+	}
+
+	syncGroupNameField()
 }
 
 const getGroupColors = async () => {
@@ -277,8 +312,7 @@ const syncLocalGroupColor = (group, color) => {
 }
 
 const syncGroupColorFromName = async () => {
-	const groupInput = form?.querySelector('[name="annotation-group"]')
-	const name = notateNormalizeGroup(groupInput?.value)
+	const name = readChosenGroup()
 	if (!name || !form) return
 
 	const colors = await getGroupColors()
@@ -292,13 +326,11 @@ const syncGroupColorFromName = async () => {
 }
 
 const syncModalFields = async (annotation) => {
-	fillGroupOptions()
-
-	const groupInput = form.querySelector('[name="annotation-group"]')
-	if (groupInput) groupInput.value = annotation?.group || ''
+	const preferredGroup = annotation?.group || pendingGroup || ''
+	await fillGroupOptions(preferredGroup)
 
 	const colors = await getGroupColors()
-	const groupName = notateNormalizeGroup(groupInput?.value)
+	const groupName = readChosenGroup()
 	const color = notateResolveGroupColor(groupName, colors, annotation?.color)
 	modal.dataset.color = color
 
@@ -320,9 +352,7 @@ const readModalMeta = () => {
 		color: notateNormalizeColor(
 			form.querySelector('[name="annotation-color"]:checked')?.value || current?.color
 		),
-		group: notateNormalizeGroup(
-			form.querySelector('[name="annotation-group"]')?.value ?? current?.group ?? ''
-		),
+		group: readChosenGroup(),
 		interaction: notateNormalizeInteraction({
 			kind: form.querySelector('[name="annotation-state"]:checked')?.value
 				|| current?.interaction?.kind
@@ -367,14 +397,14 @@ const openCaptureModal = (kind, event = {}) => {
 // open modal to create a new annotation
 // HTMLDialogElement.showModal: https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal
 // stores the clicked target in activeTarget, clears edit mode, opens modal
-const openCreateModal = (target) => {
+const openCreateModal = async (target) => {
 	createModal()
 
 	activeTarget = target
 	editingAnnotationId = null
 	textarea.value = ''
 	scaleNoteType('', textarea)
-	syncModalFields()
+	await syncModalFields({ group: pendingGroup })
 	syncModalCopy()
 	modal.showModal()
 	placeModalNear(target)
@@ -509,9 +539,15 @@ const createModal = () => {
 			<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
 			<label>
 				Group
-				<input name="annotation-group" list="notate-groups" placeholder="Across every page" autocomplete="off">
+				<select name="annotation-group-choice" aria-label="Choose a group">
+					<option value="">No group</option>
+					<option value="${NOTATE_NEW_GROUP}">New group</option>
+				</select>
 			</label>
-			<datalist id="notate-groups"></datalist>
+			<label data-group-name hidden>
+				Name
+				<input name="annotation-group" placeholder="Name this group" autocomplete="off">
+			</label>
 			<fieldset>
 				<legend>Color</legend>
 				<label data-color="yellow">
@@ -553,6 +589,19 @@ const createModal = () => {
 	form.addEventListener('submit', onModalSubmit)
 	textarea.addEventListener('input', () => {
 		scaleNoteType(textarea.value, textarea)
+	})
+	form.querySelector('[name="annotation-group-choice"]')?.addEventListener('change', () => {
+		const select = form.querySelector('[name="annotation-group-choice"]')
+		const nameInput = form.querySelector('[name="annotation-group"]')
+		if (select?.value && select.value !== NOTATE_NEW_GROUP && nameInput) {
+			nameInput.value = select.value
+		}
+		if (select?.value === NOTATE_NEW_GROUP && nameInput) {
+			nameInput.value = ''
+			nameInput.focus()
+		}
+		syncGroupNameField()
+		syncGroupColorFromName()
 	})
 	form.querySelector('[name="annotation-group"]')?.addEventListener('input', () => {
 		syncGroupColorFromName()
@@ -1173,13 +1222,14 @@ const initAnnotations = async () => {
 
 	await loadAnnotations()
 
-	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode'])
+	const stored = await extensionStorageGet(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode', 'notate-pending-group'])
 	const pendingUrl = stored['notate-pending-url']
 	const pendingAge = Date.now() - (stored['notate-pending-at'] || 0)
+	pendingGroup = notateNormalizeGroup(stored['notate-pending-group'] || '')
 
 	if (!pendingUrl || pendingAge > 15000 || !pageUrlsMatch(pendingUrl, location.href)) return
 
-	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode'])
+	await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode', 'notate-pending-group'])
 
 	const pendingSelector = stored['notate-pending-selector'] || null
 	const pendingMode = stored['notate-pending-mode'] === 'annotate' ? 'annotate' : 'preview'
@@ -1388,6 +1438,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	const action = runtimeActions[message.action]
 
 	if (!action) return
+
+	if (Object.hasOwn(message, 'group')) {
+		pendingGroup = notateNormalizeGroup(message.group)
+	}
 
 	action()
 })

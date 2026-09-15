@@ -4,6 +4,7 @@
 	globalThis.NOTATE_COLORS = ['yellow', 'mint', 'sky', 'peach', 'lilac', 'rose']
 	globalThis.NOTATE_COLOR_DEFAULT = 'yellow'
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
+	globalThis.NOTATE_NEW_GROUP = '__new__'
 	globalThis.NOTATE_GROUP_COLORS_KEY = 'notate-group-colors'
 	globalThis.NOTATE_LIBRARY_GROUP_KEY = 'notate-library-group'
 	globalThis.NOTATE_STATES = ['default', 'hover', 'active', 'focus', 'scroll', 'cursor']
@@ -140,6 +141,19 @@
 				.map((annotation) => globalThis.notateNormalizeGroup(annotation.group))
 				.filter(Boolean)
 		)].sort((left, right) => left.localeCompare(right))
+	}
+
+	globalThis.notateCollectGroupNames = (storedAnnotations = {}, colors = {}) => {
+		const fromNotes = globalThis.notateUniqueGroups(
+			Object.values(storedAnnotations).flatMap((page) => page.annotations || [])
+		)
+		const fromColors = Object.keys(colors)
+			.map((name) => globalThis.notateNormalizeGroup(name))
+			.filter(Boolean)
+
+		return [...new Set([...fromNotes, ...fromColors])].sort((left, right) => {
+			return left.localeCompare(right)
+		})
 	}
 
 	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
