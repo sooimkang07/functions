@@ -6,6 +6,7 @@
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
 	globalThis.NOTATE_NEW_GROUP = '__new__'
 	globalThis.NOTATE_GROUP_COLORS_KEY = 'notate-group-colors'
+	globalThis.NOTATE_GROUP_ORDER_KEY = 'notate-group-order'
 	globalThis.NOTATE_LIBRARY_GROUP_KEY = 'notate-library-group'
 	globalThis.NOTATE_STATES = ['default', 'hover', 'active', 'focus', 'scroll', 'cursor']
 	globalThis.NOTATE_STATE_DEFAULT = 'default'
@@ -154,6 +155,48 @@
 		return [...new Set([...fromNotes, ...fromColors])].sort((left, right) => {
 			return left.localeCompare(right)
 		})
+	}
+
+	globalThis.notateOrderGroupNames = (names = [], order = []) => {
+		const unique = [...new Set(
+			names
+				.map((name) => globalThis.notateNormalizeGroup(name))
+				.filter((name) => name && name !== globalThis.NOTATE_UNGROUPED)
+		)]
+		const seen = new Set()
+		const ordered = []
+
+		order.forEach((name) => {
+			const key = globalThis.notateNormalizeGroup(name)
+			if (!key || seen.has(key) || !unique.includes(key)) return
+			seen.add(key)
+			ordered.push(key)
+		})
+
+		unique
+			.filter((name) => !seen.has(name))
+			.sort((left, right) => left.localeCompare(right))
+			.forEach((name) => ordered.push(name))
+
+		return ordered
+	}
+
+	globalThis.notateMoveGroupName = (names = [], from, to, after = false) => {
+		const list = globalThis.notateOrderGroupNames(names, names)
+		const moving = globalThis.notateNormalizeGroup(from)
+		const target = globalThis.notateNormalizeGroup(to)
+
+		if (!moving || !list.includes(moving)) return list
+		if (moving === target) return list
+
+		const without = list.filter((name) => name !== moving)
+		if (!target || !without.includes(target)) {
+			without.unshift(moving)
+			return without
+		}
+
+		without.splice(without.indexOf(target) + (after ? 1 : 0), 0, moving)
+		return without
 	}
 
 	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
