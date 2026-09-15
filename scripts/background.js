@@ -4,8 +4,6 @@ importScripts('url-match.js', 'safe-storage.js', 'icons.js')
 // tried doing it directly in popup.js but the focus call didn't do anything
 // the background script runs outside the popup so it can actually take over after the popup closes
 
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
-
 const pingTab = async (tabId) => {
 	await chrome.tabs.sendMessage(tabId, { action: 'notate-ping' })
 }
@@ -176,7 +174,6 @@ const applyToolbarIcon = async () => {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-	chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 	applyToolbarIcon()
 })
 chrome.runtime.onStartup.addListener(applyToolbarIcon)

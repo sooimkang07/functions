@@ -65,7 +65,7 @@ const syncAddNoteAction = async () => {
 
 	if (!pageOk) {
 		banner.hidden = false
-		banner.textContent = 'Open a website to add a note. New Tab and chrome:// pages cannot be marked.'
+		banner.textContent = "Open any website to start annotating. New Tab and chrome:// pages can't be annotated."
 		return
 	}
 
@@ -669,7 +669,7 @@ const renderEmptyState = () => {
 	list.innerHTML = `
 		<li class="popup-empty-state">
 			<h2>No notes yet</h2>
-			<p>Click New, then mark anything on the page.</p>
+			<p>Click New, then select anything on this page to add your first note.</p>
 		</li>
 	`
 }
@@ -828,7 +828,7 @@ const onStartAnnotatingClick = async () => {
 	const result = await sendActionToActiveTab('enter-annotation-mode')
 
 	if (result?.reason === 'restricted') {
-		renderStatusMessage('Open a website first. New Tab and chrome:// pages cannot be marked.')
+		renderStatusMessage("Open any website to start annotating. New Tab and chrome:// pages can't be annotated.")
 		return
 	}
 

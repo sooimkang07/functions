@@ -659,8 +659,8 @@ html {
 
 .notate-note {
 	position: absolute;
-	inline-size: min(var(--inline-size-note), calc(100vw - (var(--space-md) * 2)));
-	max-inline-size: calc(100vw - (var(--space-md) * 2));
+	inline-size: max-content;
+	max-inline-size: min(var(--inline-size-note), calc(100vw - (var(--space-md) * 2)));
 	padding: var(--space-sm);
 	background: var(--note-bg, var(--color-note));
 	border-radius: var(--radius-sm);

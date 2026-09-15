@@ -2,14 +2,13 @@
 	"manifest_version": 3,
 	"name": "Notate",
 	"description": "Annotate specific elements on live pages. Keep what caught your attention, why it mattered, and the original context so you can return later.",
-	"version": "1.14",
+	"version": "1.15",
 	"permissions": [
 		"activeTab",
 		"tabs",
 		"windows",
 		"storage",
-		"scripting",
-		"sidePanel"
+		"scripting"
 	],
 	"host_permissions": [
 		"http://*/*",
@@ -20,15 +19,13 @@
 	},
 	"action": {
 		"default_title": "Notate",
+		"default_popup": "index.html",
 		"default_icon": {
 			"16": "images/icon-16.png",
 			"32": "images/icon-32.png",
 			"48": "images/icon-48.png",
 			"128": "images/icon-128.png"
 		}
-	},
-	"side_panel": {
-		"default_path": "index.html"
 	},
 	"content_scripts": [
 		{

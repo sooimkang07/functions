@@ -59,7 +59,7 @@
 	--duration-md: 120ms;
 	--duration-coyote: var(--duration-md);
 
-	--popup-inline-size: 100%;
+	--popup-inline-size: 23rem;
 	--toggle-inline-size: 2.5rem;
 	--annotation-indent: calc(var(--space-sm) + 1rem + var(--space-xs));
 	--blur-toolbar: 0.75rem;
@@ -96,7 +96,7 @@ html, body {
 	padding: 0;
 	inline-size: var(--popup-inline-size);
 	max-inline-size: 100%;
-	min-block-size: 100%;
+	min-block-size: 0;
 	overflow-inline: hidden;
 	background: var(--color-bg);
 	color-scheme: light;
