@@ -56,7 +56,7 @@
 	--duration-coyote: var(--duration-md);
 
 	--popup-inline-size: 100%;
-	--toggle-inline-size: 4rem;
+	--toggle-inline-size: 5.5rem;
 	--annotation-indent: calc(var(--space-sm) + 1rem + var(--space-xs));
 	--blur-toolbar: 1.25rem;
 }
@@ -147,11 +147,11 @@ body {
 		align-items: center;
 		justify-content: center;
 		padding-block: var(--space-xs);
-		padding-inline: var(--space-sm);
-		border: var(--border-ui);
-		border-radius: var(--radius-sm);
-		background: var(--color-surface);
-		color: var(--color-text);
+		padding-inline: var(--space-md);
+		border: none;
+		border-radius: var(--radius-pill);
+		background: var(--color-text);
+		color: var(--color-surface);
 		cursor: pointer;
 		font: var(--fw-medium) var(--fs-regular) var(--font-ui);
 		box-shadow: var(--shadow-sm);
@@ -161,7 +161,8 @@ body {
 		transition-delay: var(--duration-coyote);
 
 		&:hover {
-			background: var(--color-hover);
+			background: var(--color-text);
+			color: var(--color-surface);
 			transition-delay: 0s;
 		}
 
@@ -206,26 +207,33 @@ header {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: var(--space-xs);
+		gap: var(--space-xs);
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-sm);
 		cursor: pointer;
+		border: none;
 		border-radius: var(--radius-pill);
-		background-color: transparent;
+		background: var(--color-text);
+		color: var(--color-surface);
 		flex-shrink: 0;
+		font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+		white-space: nowrap;
+		box-shadow: var(--shadow-sm);
 		transition:
 			background-color var(--duration) var(--ease),
 			color var(--duration) var(--ease);
 		transition-delay: var(--duration-coyote);
 
 		svg {
-			inline-size: 1.125rem;
-			block-size: 1.125rem;
-			color: var(--color-text-secondary);
+			inline-size: 0.875rem;
+			block-size: 0.875rem;
+			color: currentColor;
 		}
 
 		&:hover {
-			background: var(--color-hover);
+			background: var(--color-text);
 			border-radius: var(--radius-pill);
-			color: var(--color-text);
+			color: var(--color-surface);
 			transition-delay: 0s;
 		}
 
@@ -319,13 +327,37 @@ header {
 	padding-block: var(--space-lg);
 	padding-inline: var(--space-sm);	
 	font-size: var(--fs-regular);
-	color: var(--color-text-tertiary);
+	color: var(--color-text-secondary);
 	text-align: start;
 	white-space: normal;
 	line-height: 1.4;
+
+	h2 {
+		margin: 0;
+		font-family: var(--font-note);
+		font-size: var(--fs-xl);
+		font-weight: var(--fw-semibold);
+		color: var(--color-text);
+	}
+
+	p {
+		margin-block: var(--space-xs) 0;
+		margin-inline: 0;
+		max-inline-size: 22rem;
+		color: var(--color-text-secondary);
+	}
 }
 
 /* ---------------ANNOTATED PAGES LIST--------------- */
+
+.popup-page-item {
+	margin-block: var(--space-2xs);
+	background: var(--color-surface);
+	border: var(--border-ui);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-sm);
+	overflow: hidden;
+}
 
 .popup-page-row {
 	display: flex;
@@ -339,7 +371,7 @@ header {
 		font-family: var(--font-ui);
 		font-size: var(--fs-regular);
 		font-weight: var(--fw-regular);
-		border-radius: var(--radius-sm);
+		border-radius: 0;
 		transition: background-color var(--duration) var(--ease);
 		transition-delay: var(--duration-coyote);
 
@@ -360,10 +392,15 @@ header {
 		display: flex;
 		align-items: center;
 		gap: var(--space-xs);
-		padding-block: var(--space-xs);
+		padding-block: var(--space-sm);
 		padding-inline: var(--space-sm);
 		color: var(--color-text);
 		text-align: start;
+
+		&[aria-current="page"] {
+			background: var(--color-note-hover);
+			font-weight: var(--fw-medium);
+		}
 
 		img {
 			flex-shrink: 0;
@@ -384,13 +421,19 @@ header {
 		justify-content: flex-end;
 		gap: var(--space-2xs);
 		flex-shrink: 0;
-		inline-size: var(--toggle-inline-size);
+		inline-size: auto;
+		min-inline-size: var(--toggle-inline-size);
 		padding-inline: var(--space-sm);
 		color: var(--color-text-tertiary);
+		font-size: var(--fs-sm);
 		transition:
 			background-color var(--duration) var(--ease),
 			color var(--duration) var(--ease);
 		transition-delay: var(--duration-coyote);
+
+		span {
+			white-space: nowrap;
+		}
 
 		svg {
 			flex-shrink: 0;

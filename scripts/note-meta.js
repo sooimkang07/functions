@@ -6,6 +6,19 @@
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
 	globalThis.NOTATE_STATES = ['default', 'hover', 'active', 'focus', 'scroll', 'cursor']
 	globalThis.NOTATE_STATE_DEFAULT = 'default'
+	globalThis.NOTATE_STATE_LABELS = {
+		default: 'As it is',
+		hover: 'Hovering',
+		active: 'Pressed',
+		focus: 'Focused',
+		scroll: 'This scroll',
+		cursor: 'This cursor'
+	}
+
+	globalThis.notateStateLabel = (kind) => {
+		const state = globalThis.notateNormalizeState(kind)
+		return globalThis.NOTATE_STATE_LABELS[state] || globalThis.NOTATE_STATE_LABELS[globalThis.NOTATE_STATE_DEFAULT]
+	}
 
 	globalThis.notateEscapeHtml = (value = '') => {
 		return String(value)
@@ -48,10 +61,13 @@
 	globalThis.notateInteractionLabel = (interaction = {}) => {
 		const { kind, cursor } = globalThis.notateNormalizeInteraction(interaction)
 		if (kind === globalThis.NOTATE_STATE_DEFAULT) return ''
-		if (kind === 'cursor' || (cursor && cursor !== 'auto' && cursor !== 'default')) {
-			return `${kind} · ${cursor}`
+
+		const label = globalThis.notateStateLabel(kind)
+		if (kind === 'cursor' && cursor && cursor !== 'auto' && cursor !== 'default') {
+			return `${label} · ${cursor}`
 		}
-		return kind
+
+		return label
 	}
 
 	globalThis.notateNormalizeAnnotation = (annotation = {}) => ({

@@ -1,5 +1,5 @@
 OVERVIEW
-Notate is a Chrome extension that allows live “notating” directly on any webpage. Instead of separating notes from their source, notations are anchored directly to the user-selected DOM, allowing users to capture thoughts exactly where they occur. All saved notations are saved down the entire page as the user freely scrolls as well as within the popup itself, allowing users to jump to their notated pages and their individual notations in each one. 
+Notate is a Chrome extension that lets users annotate specific elements directly on live webpages, preserving what caught their attention, why it mattered, and the original context so they can easily return to it later. Notes stay attached to the element as the page scrolls. The side panel is a quiet library of marked pages — click a page or a note to jump back. 
 
 This is V1 of Notate, limited by time and my current skillset. But, I aim to expand this into a more highly functional and customizable extension to eventually be put up in the extension store for users to freely use across any and all websites. 
 
@@ -11,10 +11,10 @@ Use a copy that stays on this Mac:
 1. Open Terminal in this project folder and run:
    `chmod +x copy-to-local.sh && ./copy-to-local.sh`
 2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
-3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.4**.
+3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.5**.
 4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **side panel** that stays open while you scroll and switch pages.
-5. The pencil only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be annotated. Click a saved page in the side panel first, then use the pencil.
-6. Clicking a saved page or note opens **preview** (the site’s hover, cursor, and scroll still work). Hold **⌥** to aim, then **⌥A** or **⌥-click** to capture that live state. **Edit** writes notes; **Move** drags them. ⌘↩ saves. Export is in the side panel.
+5. **Add note** only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be marked. Open a website first, or click a saved page in the side panel.
+6. How it works: **Add note** → click the element that caught your eye → write why it mattered → ⌘↩ to save. Opening a saved page shows your notes while the site still works (**Done** in the page bar). Drag a note to reposition it while adding, or use **Reposition**. **Hide** puts the page away. Export is in the side panel.
 7. If the toolbar/popup N icon is missing, the PNGs in `images/` are still iCloud cloud-only files. Right-click `images` → **Download Now** / **Keep Downloaded**, or load from `~/notate-extension`. Click **Clear all** on the Errors page — Chrome keeps old errors after Reload.
 
 If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.

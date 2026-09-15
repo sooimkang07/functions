@@ -34,8 +34,11 @@ const isRestrictedTab = (tab) => {
 	return !/^https?:/.test(url)
 }
 
+let bannerIsError = false
+
 const renderStatusMessage = (text) => {
 	const banner = document.querySelector('#popup-banner')
+	bannerIsError = true
 	if (banner) {
 		banner.hidden = false
 		banner.textContent = text
@@ -47,6 +50,27 @@ const renderStatusMessage = (text) => {
 	list.innerHTML = `
 		<li class="popup-empty-state">${text}</li>
 	`
+}
+
+const syncAddNoteAction = async () => {
+	const tab = await getActiveTab()
+	const pageOk = Boolean(tab?.id) && !isRestrictedTab(tab)
+
+	if (annotateButton) {
+		annotateButton.hidden = !pageOk
+	}
+
+	const banner = document.querySelector('#popup-banner')
+	if (!banner || bannerIsError) return
+
+	if (!pageOk) {
+		banner.hidden = false
+		banner.textContent = 'Open a website to add a note. New Tab and chrome:// pages cannot be marked.'
+		return
+	}
+
+	banner.hidden = true
+	banner.textContent = ''
 }
 
 const escapeHtml = (value = '') => notateEscapeHtml(value)
@@ -194,12 +218,12 @@ const createPageItem = (page) => {
 	return `
 		<li class="popup-page-item">
 			<section class="popup-page-row">
-				<button class="popup-page-button" type="button" data-url="${escapeHtml(page.url)}">
+				<button class="popup-page-button" type="button" data-url="${escapeHtml(page.url)}" aria-current="${page.isCurrent ? 'page' : 'false'}">
 					<img class="popup-page-favicon" src="${favicon}" alt="">
 					<span class="popup-page-title">${escapeHtml(page.title || page.url)}</span>
 				</button>
-				<button class="popup-page-toggle" type="button" aria-label="Toggle annotations">
-					<span class="popup-page-count">${count}</span>
+				<button class="popup-page-toggle" type="button" aria-label="${count === 1 ? '1 note' : `${count} notes`}">
+					<span class="popup-page-count">${count === 1 ? '1 note' : `${count} notes`}</span>
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7071 14.7071C12.3166 15.0976 11.6834 15.0976 11.2929 14.7071L6.29289 9.70711C5.90237 9.31658 5.90237 8.68342 6.29289 8.29289C6.68342 7.90237 7.31658 7.90237 7.70711 8.29289L12 12.5858L16.2929 8.29289C16.6834 7.90237 17.3166 7.90237 17.7071 8.29289C18.0976 8.68342 18.0976 9.31658 17.7071 9.70711L12.7071 14.7071Z" fill="currentColor"/></svg>				</button>
 			</section>
 			<ul class="popup-annotation-list" hidden>
@@ -213,7 +237,10 @@ const createPageItem = (page) => {
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 const renderEmptyState = () => {
 	list.innerHTML = `
-		<li class="popup-empty-state">No Notated pages</li>
+		<li class="popup-empty-state">
+			<h2>Nothing marked yet</h2>
+			<p>Click Add note, then click what caught your eye. Notate keeps the element, why it mattered, and the page so you can come back.</p>
+		</li>
 	`
 }
 
@@ -316,13 +343,18 @@ const bindPageButtons = () => {
 const renderAnnotatedPages = async () => {
 	const storedAnnotations = await getStoredAnnotations()
 	const pages = getSortedPages(storedAnnotations)
+	const tab = await getActiveTab()
+	const currentUrl = tab?.url || ''
 
 	if (!pages.length) {
 		renderEmptyState()
 		return
 	}
 
-	list.innerHTML = pages.map(createPageItem).join('')
+	list.innerHTML = pages.map((page) => createPageItem({
+		...page,
+		isCurrent: Boolean(currentUrl) && pageUrlsMatch(page.url, currentUrl)
+	})).join('')
 	bindPageButtons()
 }
 
@@ -332,12 +364,12 @@ const onStartAnnotatingClick = async () => {
 	const result = await sendActionToActiveTab('enter-annotation-mode')
 
 	if (result?.reason === 'restricted') {
-		renderStatusMessage('Open a regular website first. Chrome’s new tab page and chrome:// pages cannot be annotated. Click a Notated page below, then use the pencil.')
+		renderStatusMessage('Open a website first. New Tab and chrome:// pages cannot be marked. Click a saved page below, then click Add note.')
 		return
 	}
 
 	if (result?.ok === false) {
-		renderStatusMessage('Notate could not reach this tab. Try a regular http/https page, then click the pencil again.')
+		renderStatusMessage('Notate could not reach this tab. Open a regular http/https page, then click Add note.')
 	}
 }
 
@@ -346,7 +378,7 @@ const exportAllAnnotations = async () => {
 	const pages = getSortedPages(storedAnnotations)
 
 	if (!pages.length) {
-		renderStatusMessage('Nothing to export yet. Add a notation first.')
+		renderStatusMessage('Nothing to export yet. Add a note first.')
 		return
 	}
 
@@ -357,7 +389,7 @@ const exportAllAnnotations = async () => {
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
-	if (!window.confirm('Clear all notations? This cannot be undone.')) return
+	if (!window.confirm('Clear every note? This cannot be undone.')) return
 
 	await extensionStorageRemove(storageKey)
 	renderAnnotatedPages()
@@ -387,10 +419,12 @@ const initPopup = () => {
 
 	if (!getExtensionStorage()) {
 		renderStatusMessage('Notate has to run as a loaded Chrome extension, not as a webpage. Load unpacked from a local folder (not iCloud), then use the toolbar icon.')
+		renderEmptyState()
+		showOnboard(true)
 		return
 	}
 
-	annotateButton.addEventListener('click', onStartAnnotatingClick)
+	annotateButton?.addEventListener('click', onStartAnnotatingClick)
 
 	const clearAllButton = document.querySelector('[data-action="clear-all"]')
 	clearAllButton.addEventListener('click', clearAllAnnotations)
@@ -402,12 +436,26 @@ const initPopup = () => {
 	dismissButton?.addEventListener('click', dismissOnboard)
 
 	initOnboard()
+	syncAddNoteAction().catch(() => {})
 	renderAnnotatedPages().catch(() => {
-		renderStatusMessage('Could not read saved notations. Click Reload on chrome://extensions, and load from a local folder rather than iCloud.')
+		renderStatusMessage('Could not read saved notes. Click Reload on chrome://extensions, and load from a local folder rather than iCloud.')
 	})
 
 	chrome.storage?.onChanged?.addListener((changes) => {
 		if (changes[storageKey]) renderAnnotatedPages()
+	})
+
+	chrome.tabs?.onActivated?.addListener(() => {
+		syncAddNoteAction()
+		renderAnnotatedPages()
+	})
+
+	chrome.tabs?.onUpdated?.addListener(async (tabId, changeInfo) => {
+		if (changeInfo.status !== 'complete' && !changeInfo.url) return
+		const tab = await getActiveTab()
+		if (tab?.id !== tabId) return
+		syncAddNoteAction()
+		renderAnnotatedPages()
 	})
 }
 
