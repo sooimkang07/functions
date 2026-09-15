@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "Notate",
 	"description": "Annotate webpage elements with notes",
-	"version": "1.2",
+	"version": "1.3",
 	"permissions": [
 		"activeTab",
 		"tabs",
@@ -39,6 +39,7 @@
 			"js": [
 				"scripts/url-match.js",
 				"scripts/safe-storage.js",
+				"scripts/note-meta.js",
 				"scripts/webpage.js"
 			],
 			"css": [

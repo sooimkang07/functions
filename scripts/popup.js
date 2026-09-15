@@ -49,14 +49,7 @@ const renderStatusMessage = (text) => {
 	`
 }
 
-const escapeHtml = (value = '') => {
-	return String(value)
-		.replace(/&/g, '&amp;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-}
+const escapeHtml = (value = '') => notateEscapeHtml(value)
 
 const pingTab = async (tabId) => {
 	await chrome.tabs.sendMessage(tabId, { action: 'notate-ping' })
@@ -65,7 +58,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -167,15 +160,35 @@ const getSortedPages = (storedAnnotations) => {
 // template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
 // each annotation is a clickable button with its selector saved in data-selector so I can scroll right to it
 // reversed so the most recently added annotation shows up at the top of the dropdown: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse
+const createAnnotationButton = (page, annotation) => {
+	return `
+		<li>
+			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(annotation.color))}">${escapeHtml(annotation.text)}</button>
+		</li>
+	`
+}
+
 const createPageItem = (page) => {
-	const count = page.annotations.length
+	const notes = page.annotations || []
+	const count = notes.length
 	const origin = new URL(page.url).origin
 	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=32`
-	const annotationItems = [...page.annotations].reverse().map((a) => `
-		<li>
-			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(a.selector)}">${escapeHtml(a.text)}</button>
-		</li>
-	`).join('')
+	const annotations = [...notes].map(notateNormalizeAnnotation).reverse()
+	const grouped = notateGroupedAnnotations(annotations)
+	const showGroupHeadings = grouped.some(([name]) => name !== NOTATE_UNGROUPED)
+	const annotationItems = grouped.map(([name, items]) => {
+		const buttons = items.map((annotation) => createAnnotationButton(page, annotation)).join('')
+		if (!showGroupHeadings) return buttons
+
+		return `
+			<li>
+				<h3>${escapeHtml(name)}</h3>
+				<ul>
+					${buttons}
+				</ul>
+			</li>
+		`
+	}).join('')
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join
 
 	return `
@@ -328,6 +341,19 @@ const onStartAnnotatingClick = async () => {
 	}
 }
 
+const exportAllAnnotations = async () => {
+	const storedAnnotations = await getStoredAnnotations()
+	const pages = getSortedPages(storedAnnotations)
+
+	if (!pages.length) {
+		renderStatusMessage('Nothing to export yet. Add a notation first.')
+		return
+	}
+
+	const stamp = new Date().toISOString().slice(0, 10)
+	notateDownloadJson(notateExportPayload(storedAnnotations), `notate-${stamp}.json`)
+}
+
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
@@ -368,6 +394,9 @@ const initPopup = () => {
 
 	const clearAllButton = document.querySelector('[data-action="clear-all"]')
 	clearAllButton.addEventListener('click', clearAllAnnotations)
+
+	const exportButton = document.querySelector('[data-action="export"]')
+	exportButton?.addEventListener('click', exportAllAnnotations)
 
 	const dismissButton = document.querySelector('[data-action="dismiss-onboard"]')
 	dismissButton?.addEventListener('click', dismissOnboard)
