@@ -148,6 +148,7 @@ const closeModal = () => {
 	if (!modal) return
 
 	resetModalState()
+	showNoteScreen()
 	modal.close()
 }
 
@@ -223,10 +224,57 @@ const readChosenGroup = () => {
 	return notateNormalizeGroup(choice)
 }
 
-const syncGroupNameField = () => {
+const noteScreen = () => form?.querySelector('[data-screen="note"]')
+const groupScreen = () => form?.querySelector('[data-screen="group"]')
+const noteActions = () => form?.querySelector('[data-note-actions]')
+const groupActions = () => form?.querySelector('[data-group-actions]')
+
+const showNoteScreen = () => {
+	if (!form) return
+
+	form.dataset.screen = 'note'
+	if (noteScreen()) noteScreen().hidden = false
+	if (groupScreen()) groupScreen().hidden = true
+	if (noteActions()) noteActions().hidden = false
+	if (groupActions()) groupActions().hidden = true
+}
+
+const showGroupScreen = () => {
+	if (!form) return
+
+	form.dataset.screen = 'group'
+	if (noteScreen()) noteScreen().hidden = true
+	if (groupScreen()) groupScreen().hidden = false
+	if (noteActions()) noteActions().hidden = true
+	if (groupActions()) groupActions().hidden = false
+	form.querySelector('[name="annotation-group"]')?.focus()
+}
+
+const confirmNewGroup = () => {
 	const select = form?.querySelector('[name="annotation-group-choice"]')
-	const nameField = form?.querySelector('[data-group-name]')
-	if (nameField) nameField.hidden = select?.value !== NOTATE_NEW_GROUP
+	const nameInput = form?.querySelector('[name="annotation-group"]')
+	const name = notateNormalizeGroup(nameInput?.value ?? '')
+	if (!select || !nameInput) return false
+	if (!name) {
+		nameInput.focus()
+		return false
+	}
+
+	const exists = [...select.options].some((option) => option.value === name)
+	if (!exists) {
+		const option = document.createElement('option')
+		option.value = name
+		option.textContent = name
+		const noGroup = select.querySelector('option[value=""]')
+		if (noGroup) select.insertBefore(option, noGroup)
+		else select.append(option)
+	}
+
+	select.value = name
+	nameInput.value = name
+	showNoteScreen()
+	syncGroupColorFromName()
+	return true
 }
 
 const fillGroupOptions = async (preferred = '') => {
@@ -236,29 +284,40 @@ const fillGroupOptions = async (preferred = '') => {
 
 	const stored = await getStoredAnnotations()
 	const colors = await getGroupColors()
-	const names = notateCollectGroupNames(stored, colors)
+	const orderStored = await extensionStorageGet(NOTATE_GROUP_ORDER_KEY)
+	const savedOrder = Array.isArray(orderStored[NOTATE_GROUP_ORDER_KEY])
+		? orderStored[NOTATE_GROUP_ORDER_KEY]
+		: []
+	const names = notateOrderGroupNames(
+		notateCollectGroupNames(stored, colors),
+		savedOrder
+	)
 	const preferredName = notateNormalizeGroup(preferred)
+	const namedOptions = names.map((name) => {
+		return `<option value="${notateEscapeHtml(name)}">${notateEscapeHtml(name)}</option>`
+	})
 
 	select.innerHTML = [
-		'<option value="">No group</option>',
-		...names.map((name) => {
-			return `<option value="${notateEscapeHtml(name)}">${notateEscapeHtml(name)}</option>`
-		}),
-		`<option value="${NOTATE_NEW_GROUP}">New group</option>`
-	].join('')
+		`<option value="${NOTATE_NEW_GROUP}">+ New Group</option>`,
+		'<hr>',
+		...namedOptions,
+		namedOptions.length ? '<hr>' : '',
+		'<option value="">No group</option>'
+	].filter(Boolean).join('')
 
 	if (preferredName && names.includes(preferredName)) {
 		select.value = preferredName
 		if (nameInput) nameInput.value = preferredName
+		showNoteScreen()
 	} else if (preferredName) {
 		select.value = NOTATE_NEW_GROUP
 		if (nameInput) nameInput.value = preferredName
+		showGroupScreen()
 	} else {
 		select.value = ''
 		if (nameInput) nameInput.value = ''
+		showNoteScreen()
 	}
-
-	syncGroupNameField()
 }
 
 const getGroupColors = async () => {
@@ -536,18 +595,20 @@ const createModal = () => {
 
 	modal.innerHTML = `
 		<form method="dialog">
-			<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
-			<label>
-				Group
-				<select name="annotation-group-choice" aria-label="Choose a group">
-					<option value="">No group</option>
-					<option value="${NOTATE_NEW_GROUP}">New group</option>
-				</select>
-			</label>
-			<label data-group-name hidden>
-				Name
-				<input name="annotation-group" placeholder="Name this group" autocomplete="off">
-			</label>
+			<section data-screen="note">
+				<textarea id="annotation-text" name="annotation-text" aria-label="Why did this matter?" placeholder="Why did this matter?"></textarea>
+				<label>
+					Group
+					<select name="annotation-group-choice" aria-label="Choose a group">
+						<option value="${NOTATE_NEW_GROUP}">+ New Group</option>
+						<hr>
+						<option value="">No group</option>
+					</select>
+				</label>
+			</section>
+			<section data-screen="group" hidden>
+				<input name="annotation-group" placeholder="Group name" aria-label="Group name" autocomplete="off">
+			</section>
 			<fieldset>
 				<legend>Color</legend>
 				<label data-color="yellow">
@@ -569,12 +630,20 @@ const createModal = () => {
 					<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
 				</label>
 			</fieldset>
-			<menu>
+			<menu data-note-actions>
 				<li>
 					<button type="submit" name="intent" value="cancel">Cancel</button>
 				</li>
 				<li>
 					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter">Save</button>
+				</li>
+			</menu>
+			<menu data-group-actions hidden>
+				<li>
+					<button type="button" data-action="back-note">Back</button>
+				</li>
+				<li>
+					<button type="button" data-action="confirm-group">Continue</button>
 				</li>
 			</menu>
 		</form>
@@ -593,18 +662,27 @@ const createModal = () => {
 	form.querySelector('[name="annotation-group-choice"]')?.addEventListener('change', () => {
 		const select = form.querySelector('[name="annotation-group-choice"]')
 		const nameInput = form.querySelector('[name="annotation-group"]')
-		if (select?.value && select.value !== NOTATE_NEW_GROUP && nameInput) {
-			nameInput.value = select.value
+		if (select?.value === NOTATE_NEW_GROUP) {
+			if (nameInput) nameInput.value = ''
+			showGroupScreen()
+			return
 		}
-		if (select?.value === NOTATE_NEW_GROUP && nameInput) {
-			nameInput.value = ''
-			nameInput.focus()
-		}
-		syncGroupNameField()
+		if (nameInput) nameInput.value = select?.value || ''
+		showNoteScreen()
 		syncGroupColorFromName()
 	})
-	form.querySelector('[name="annotation-group"]')?.addEventListener('input', () => {
-		syncGroupColorFromName()
+	form.querySelector('[name="annotation-group"]')?.addEventListener('keydown', (event) => {
+		if (event.key !== 'Enter') return
+		event.preventDefault()
+		confirmNewGroup()
+	})
+	form.querySelector('[data-action="back-note"]')?.addEventListener('click', () => {
+		const select = form.querySelector('[name="annotation-group-choice"]')
+		if (select) select.value = ''
+		showNoteScreen()
+	})
+	form.querySelector('[data-action="confirm-group"]')?.addEventListener('click', () => {
+		confirmNewGroup()
 	})
 	modal.addEventListener('change', (event) => {
 		if (event.target.name !== 'annotation-color') return
@@ -1000,6 +1078,17 @@ const onModalSubmit = async (event) => {
 
 	if (submitValue === 'cancel') {
 		closeModal()
+		return
+	}
+
+	if (form?.dataset.screen === 'group') {
+		confirmNewGroup()
+		return
+	}
+
+	const choice = form?.querySelector('[name="annotation-group-choice"]')?.value
+	if (choice === NOTATE_NEW_GROUP) {
+		showGroupScreen()
 		return
 	}
 

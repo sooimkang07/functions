@@ -398,7 +398,7 @@ header {
 		padding-block: var(--space-xs);
 		padding-inline: var(--space-sm);
 		border: none;
-		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+		border-radius: var(--radius-md);
 		background: transparent;
 		color: var(--color-text-tertiary);
 		cursor: pointer;
@@ -424,18 +424,29 @@ header {
 		}
 
 		&:hover {
-			color: var(--color-text);
-			background: var(--color-hover);
+			color: var(--color-on-primary);
+			background: var(--color-clear);
+			box-shadow: none;
+		}
+
+		&:hover::before {
+			background: currentColor;
 		}
 
 		&[aria-selected="true"] {
 			color: var(--color-text);
-			box-shadow: inset 0 -0.125rem 0 currentColor;
+			box-shadow: none;
+			background: var(--color-hover);
 		}
 
 		&[data-color][aria-selected="true"] {
 			background: var(--note-bg);
-			box-shadow: inset 0 -0.125rem 0 color-mix(in srgb, var(--note-bg) 55%, var(--color-text));
+			box-shadow: none;
+		}
+
+		&[aria-selected="true"]:hover {
+			color: var(--color-on-primary);
+			background: var(--color-clear);
 		}
 
 		&:focus-visible {
@@ -451,6 +462,178 @@ header {
 
 	li.is-dragging button {
 		cursor: grabbing;
+	}
+}
+
+#group-tab-menu {
+	position: fixed;
+	z-index: 20;
+	min-inline-size: 8rem;
+	margin: 0;
+	padding: var(--space-2xs);
+	background: var(--color-surface);
+	border: var(--border-ui);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+
+	&[hidden] {
+		display: none;
+	}
+
+	li {
+		list-style: none;
+	}
+
+	button {
+		display: flex;
+		inline-size: 100%;
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-sm);
+		border: none;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--color-text);
+		cursor: pointer;
+		font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+		text-align: start;
+
+		&:hover,
+		&:focus-visible {
+			background: var(--color-clear);
+			color: var(--color-on-primary);
+			outline: none;
+		}
+	}
+
+	[data-action="delete-group"] {
+		color: var(--color-clear);
+
+		&:hover,
+		&:focus-visible {
+			background: var(--color-clear);
+			color: var(--color-on-primary);
+		}
+	}
+}
+
+#group-edit-dialog {
+	inline-size: min(18rem, calc(100% - var(--space-xl)));
+	padding: var(--space-sm);
+	border: var(--border-ui);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+	box-shadow: var(--shadow-md);
+	color: var(--color-text);
+
+	&::backdrop {
+		background: color-mix(in srgb, #000 24%, transparent);
+	}
+
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+	}
+
+	input[name="group-name"] {
+		inline-size: 100%;
+		padding-block: 0.375rem;
+		padding-inline: var(--space-xs);
+		border: var(--border-ui);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg);
+		font: var(--fw-regular) var(--fs-regular) var(--font-ui);
+		color: var(--color-text);
+
+		&:focus,
+		&:focus-visible {
+			outline: 0.125rem solid var(--color-focus);
+			outline-offset: 0.125rem;
+		}
+
+		&::placeholder {
+			color: var(--color-text-secondary);
+		}
+	}
+
+	fieldset {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-xs);
+		margin: 0;
+		padding: 0;
+		border: none;
+
+		legend {
+			inline-size: 100%;
+			margin-block-end: var(--space-2xs);
+			font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+			color: var(--color-text-secondary);
+		}
+
+		label {
+			position: relative;
+			inline-size: 1.25rem;
+			block-size: 1.25rem;
+			border-radius: var(--radius-pill);
+			background: var(--note-bg, var(--color-note));
+			box-shadow:
+				0 0 0 0.125rem var(--color-surface),
+				inset 0 0 0 0.0625rem color-mix(in srgb, #000 16%, transparent);
+			cursor: pointer;
+
+			&:has(:checked),
+			&:focus-within {
+				outline: 0.125rem solid var(--color-text);
+				outline-offset: 0.125rem;
+			}
+
+			input {
+				position: absolute;
+				inset: 0;
+				opacity: 0;
+				margin: 0;
+				cursor: pointer;
+			}
+		}
+	}
+
+	menu {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: var(--space-xs);
+		margin: 0;
+		padding: 0;
+
+		li {
+			list-style: none;
+		}
+
+		button {
+			padding-block: 0.375rem;
+			padding-inline: 0.625rem;
+			border: none;
+			border-radius: var(--radius-sm);
+			background: transparent;
+			color: var(--color-text);
+			cursor: pointer;
+			font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+
+			&:hover {
+				background: var(--color-hover);
+			}
+
+			&[value="save"] {
+				background: var(--color-primary);
+				color: var(--color-on-primary);
+
+				&:hover {
+					background: color-mix(in srgb, var(--color-primary) 88%, #fff);
+				}
+			}
+		}
 	}
 }
 

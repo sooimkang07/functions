@@ -199,6 +199,90 @@
 		return without
 	}
 
+	globalThis.notateRenameGroup = (stored = {}, colors = {}, order = [], from, to) => {
+		const prev = globalThis.notateNormalizeGroup(from)
+		const next = globalThis.notateNormalizeGroup(to)
+		if (!prev) {
+			return { stored, colors, order, selected: '', error: 'missing' }
+		}
+		if (!next) {
+			return { stored, colors, order, selected: prev, error: 'empty' }
+		}
+
+		const names = globalThis.notateCollectGroupNames(stored, colors)
+		if (next !== prev && names.includes(next)) {
+			return { stored, colors, order, selected: prev, error: 'taken' }
+		}
+
+		if (next === prev) {
+			return { stored, colors, order, selected: prev }
+		}
+
+		Object.values(stored).forEach((page) => {
+			;(page.annotations || []).forEach((annotation) => {
+				if (globalThis.notateNormalizeGroup(annotation.group) === prev) {
+					annotation.group = next
+				}
+			})
+		})
+
+		const nextColors = { ...colors }
+		if (nextColors[prev] && !nextColors[next]) {
+			nextColors[next] = nextColors[prev]
+		}
+		delete nextColors[prev]
+
+		const renamedOrder = order.map((name) => {
+			return globalThis.notateNormalizeGroup(name) === prev ? next : name
+		})
+
+		return {
+			stored,
+			colors: nextColors,
+			order: globalThis.notateOrderGroupNames(renamedOrder, renamedOrder),
+			selected: next
+		}
+	}
+
+	globalThis.notateDeleteGroup = (stored = {}, colors = {}, order = [], name) => {
+		const key = globalThis.notateNormalizeGroup(name)
+		if (!key) return { stored, colors, order }
+
+		Object.values(stored).forEach((page) => {
+			;(page.annotations || []).forEach((annotation) => {
+				if (globalThis.notateNormalizeGroup(annotation.group) === key) {
+					annotation.group = ''
+				}
+			})
+		})
+
+		const nextColors = { ...colors }
+		delete nextColors[key]
+
+		return {
+			stored,
+			colors: nextColors,
+			order: order.filter((item) => globalThis.notateNormalizeGroup(item) !== key)
+		}
+	}
+
+	globalThis.notateApplyGroupColor = (stored = {}, colors = {}, group, color) => {
+		const name = globalThis.notateNormalizeGroup(group)
+		const nextColor = globalThis.notateNormalizeColor(color)
+		if (!name) return { stored, colors }
+
+		const nextColors = { ...colors, [name]: nextColor }
+		Object.values(stored).forEach((page) => {
+			;(page.annotations || []).forEach((annotation) => {
+				if (globalThis.notateNormalizeGroup(annotation.group) === name) {
+					annotation.color = nextColor
+				}
+			})
+		})
+
+		return { stored, colors: nextColors }
+	}
+
 	globalThis.notateFlattenNotes = (storedAnnotations = {}) => {
 		return Object.values(storedAnnotations)
 			.flatMap((page) => {

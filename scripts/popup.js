@@ -334,9 +334,150 @@ const setGroupOrder = async (order) => {
 	})
 }
 
+const hideGroupTabMenu = () => {
+	const menu = document.querySelector('#group-tab-menu')
+	if (!menu) return
+	menu.hidden = true
+	menu.dataset.group = ''
+}
+
+const placeGroupTabMenu = (event, name) => {
+	const menu = document.querySelector('#group-tab-menu')
+	if (!menu) return
+
+	menu.hidden = false
+	menu.dataset.group = name
+	const menuWidth = menu.offsetWidth
+	const menuHeight = menu.offsetHeight
+	const inline = Math.min(event.clientX, window.innerWidth - menuWidth - 8)
+	const block = Math.min(event.clientY, window.innerHeight - menuHeight - 8)
+	menu.style.insetInlineStart = `${Math.max(8, inline)}px`
+	menu.style.insetBlockStart = `${Math.max(8, block)}px`
+}
+
+const openGroupEditor = async (name, focusColor = false) => {
+	const dialog = document.querySelector('#group-edit-dialog')
+	const form = dialog?.querySelector('form')
+	const input = form?.querySelector('[name="group-name"]')
+	if (!dialog || !form || !input) return
+
+	const colors = await getGroupColors()
+	const color = notateResolveGroupColor(name, colors)
+	input.value = name
+	form.querySelectorAll('[name="group-color"]').forEach((radio) => {
+		radio.checked = radio.value === color
+	})
+	hideGroupTabMenu()
+	dialog.returnValue = 'cancel'
+	dialog.showModal()
+	if (focusColor) {
+		form.querySelector('[name="group-color"]:checked')?.focus()
+	} else {
+		input.focus()
+		input.select()
+	}
+
+	const onClose = async () => {
+		dialog.removeEventListener('close', onClose)
+		if (dialog.returnValue !== 'save') return
+
+		const nextName = notateNormalizeGroup(form.querySelector('[name="group-name"]')?.value ?? '')
+		const nextColor = notateNormalizeColor(
+			form.querySelector('[name="group-color"]:checked')?.value || color
+		)
+		await saveGroupEdits(name, nextName, nextColor)
+	}
+
+	dialog.addEventListener('close', onClose)
+}
+
+const saveGroupEdits = async (from, to, color) => {
+	const stored = await getStoredAnnotations()
+	const colors = await getGroupColors()
+	const order = await getGroupOrder()
+	const renamed = notateRenameGroup(stored, colors, order, from, to || from)
+	if (renamed.error === 'taken') {
+		renderStatusMessage('That group name is already used.')
+		return
+	}
+	if (renamed.error === 'empty' || renamed.error === 'missing') return
+
+	const painted = notateApplyGroupColor(renamed.stored, renamed.colors, renamed.selected, color)
+	await extensionStorageSet({
+		[storageKey]: painted.stored,
+		[groupColorsKey]: painted.colors,
+		[groupOrderKey]: renamed.order
+	})
+
+	const selected = await getLibraryGroup()
+	if (selected === from) await setLibraryGroup(renamed.selected)
+	renderAnnotatedPages()
+}
+
+const deleteNamedGroup = async (name) => {
+	const key = notateNormalizeGroup(name)
+	if (!key) return
+	if (!window.confirm(`Delete “${key}”? Notes stay in All, ungrouped.`)) return
+
+	const stored = await getStoredAnnotations()
+	const colors = await getGroupColors()
+	const order = await getGroupOrder()
+	const next = notateDeleteGroup(stored, colors, order, key)
+	await extensionStorageSet({
+		[storageKey]: next.stored,
+		[groupColorsKey]: next.colors,
+		[groupOrderKey]: next.order
+	})
+
+	const selected = await getLibraryGroup()
+	if (selected === key) await setLibraryGroup('')
+	hideGroupTabMenu()
+	renderAnnotatedPages()
+}
+
+const bindGroupTabMenu = () => {
+	const menu = document.querySelector('#group-tab-menu')
+	if (!menu || menu.dataset.bound) return
+
+	menu.dataset.bound = 'true'
+	menu.addEventListener('click', async (event) => {
+		const button = event.target.closest('[data-action]')
+		const name = menu.dataset.group || ''
+		if (!button || !name) return
+
+		if (button.dataset.action === 'rename-group') {
+			await openGroupEditor(name, false)
+			return
+		}
+		if (button.dataset.action === 'recolor-group') {
+			await openGroupEditor(name, true)
+			return
+		}
+		if (button.dataset.action === 'delete-group') {
+			await deleteNamedGroup(name)
+		}
+	})
+
+	document.addEventListener('pointerdown', (event) => {
+		if (menu.hidden) return
+		if (event.target.closest('#group-tab-menu')) return
+		hideGroupTabMenu()
+	})
+
+	const dialog = document.querySelector('#group-edit-dialog')
+	dialog?.querySelector('form')?.addEventListener('submit', (event) => {
+		if (event.submitter?.value !== 'save') return
+		const input = dialog.querySelector('[name="group-name"]')
+		if (notateNormalizeGroup(input?.value ?? '')) return
+		event.preventDefault()
+		input?.focus()
+	})
+}
+
 const hideGroupTabs = () => {
 	const nav = document.querySelector('.popup-group-tabs')
 	if (nav) nav.hidden = true
+	hideGroupTabMenu()
 }
 
 const clearGroupTabDropState = (menu) => {
@@ -507,7 +648,18 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 		})
 	})
 
+	menu.querySelectorAll('li[data-group]').forEach((item) => {
+		const name = item.dataset.group || ''
+		if (!name) return
+
+		item.addEventListener('contextmenu', (event) => {
+			event.preventDefault()
+			placeGroupTabMenu(event, name)
+		})
+	})
+
 	bindGroupTabDrag(menu, ordered)
+	bindGroupTabMenu()
 }
 
 // fallback state if nothing has been saved yet
