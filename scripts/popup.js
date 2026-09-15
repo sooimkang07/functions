@@ -223,7 +223,7 @@ const createPageItem = (page) => {
 					<span class="popup-page-title">${escapeHtml(page.title || page.url)}</span>
 				</button>
 				<button class="popup-page-toggle" type="button" aria-label="${count === 1 ? '1 note' : `${count} notes`}">
-					<span class="popup-page-count">${count === 1 ? '1 note' : `${count} notes`}</span>
+					<span class="popup-page-count">${count}</span>
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7071 14.7071C12.3166 15.0976 11.6834 15.0976 11.2929 14.7071L6.29289 9.70711C5.90237 9.31658 5.90237 8.68342 6.29289 8.29289C6.68342 7.90237 7.31658 7.90237 7.70711 8.29289L12 12.5858L16.2929 8.29289C16.6834 7.90237 17.3166 7.90237 17.7071 8.29289C18.0976 8.68342 18.0976 9.31658 17.7071 9.70711L12.7071 14.7071Z" fill="currentColor"/></svg>				</button>
 			</section>
 			<ul class="popup-annotation-list" hidden>
@@ -238,8 +238,8 @@ const createPageItem = (page) => {
 const renderEmptyState = () => {
 	list.innerHTML = `
 		<li class="popup-empty-state">
-			<h2>Nothing marked yet</h2>
-			<p>Click Add note, then click what caught your eye. Notate keeps the element, why it mattered, and the page so you can come back.</p>
+			<h2>No notes yet</h2>
+			<p>Click New, then mark anything on the page.</p>
 		</li>
 	`
 }
@@ -364,12 +364,12 @@ const onStartAnnotatingClick = async () => {
 	const result = await sendActionToActiveTab('enter-annotation-mode')
 
 	if (result?.reason === 'restricted') {
-		renderStatusMessage('Open a website first. New Tab and chrome:// pages cannot be marked. Click a saved page below, then click Add note.')
+		renderStatusMessage('Open a website first. New Tab and chrome:// pages cannot be marked.')
 		return
 	}
 
 	if (result?.ok === false) {
-		renderStatusMessage('Notate could not reach this tab. Open a regular http/https page, then click Add note.')
+		renderStatusMessage('Notate could not reach this tab. Open a regular website, then click New.')
 	}
 }
 
@@ -426,14 +426,9 @@ const initPopup = () => {
 
 	annotateButton?.addEventListener('click', onStartAnnotatingClick)
 
-	const clearAllButton = document.querySelector('[data-action="clear-all"]')
-	clearAllButton.addEventListener('click', clearAllAnnotations)
-
-	const exportButton = document.querySelector('[data-action="export"]')
-	exportButton?.addEventListener('click', exportAllAnnotations)
-
-	const dismissButton = document.querySelector('[data-action="dismiss-onboard"]')
-	dismissButton?.addEventListener('click', dismissOnboard)
+	document.querySelector('[data-action="clear-all"]')?.addEventListener('click', clearAllAnnotations)
+	document.querySelector('[data-action="export"]')?.addEventListener('click', exportAllAnnotations)
+	document.querySelector('[data-action="dismiss-onboard"]')?.addEventListener('click', dismissOnboard)
 
 	initOnboard()
 	syncAddNoteAction().catch(() => {})
