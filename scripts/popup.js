@@ -1118,21 +1118,78 @@ const clearAllAnnotations = async () => {
 }
 
 const onboardKey = 'notate-onboarded'
+const gsStepCount = 4
+let gsStep = 0
 
 const showOnboard = (visible) => {
-	const onboard = document.querySelector('.popup-onboard')
+	const onboard = document.querySelector('#getting-started')
 	if (!onboard) return
 	onboard.hidden = !visible
+	document.body.classList.toggle('is-getting-started', visible)
+	if (visible) setGettingStartedStep(gsStep)
+}
+
+const setGettingStartedStep = (step) => {
+	gsStep = Math.max(0, Math.min(gsStepCount - 1, Number(step) || 0))
+
+	document.querySelectorAll('.gs-step').forEach((btn) => {
+		const index = Number(btn.dataset.gsStep)
+		const isActive = index === gsStep
+		const isDone = index < gsStep
+		btn.classList.toggle('is-active', isActive)
+		btn.classList.toggle('is-done', isDone)
+		if (isActive) btn.setAttribute('aria-current', 'step')
+		else btn.removeAttribute('aria-current')
+	})
+
+	document.querySelectorAll('.gs-panel').forEach((panel) => {
+		const index = Number(panel.dataset.gsPanel)
+		const active = index === gsStep
+		panel.hidden = !active
+		panel.classList.toggle('is-active', active)
+	})
 }
 
 const dismissOnboard = async () => {
-	await extensionStorageSet({ [onboardKey]: true })
+	try {
+		await extensionStorageSet({ [onboardKey]: true })
+	} catch {
+		// still close the panel when storage is unavailable (preview / load errors)
+	}
 	showOnboard(false)
 }
 
+const finishOnboardAndAnnotate = async () => {
+	await dismissOnboard()
+	if (typeof onStartAnnotatingClick === 'function') {
+		await onStartAnnotatingClick()
+	}
+}
+
 const initOnboard = async () => {
+	const forcePreview = /(?:\?|&)onboard=1(?:&|$)/.test(location.search) || location.hash === '#onboard'
+	if (forcePreview) {
+		showOnboard(true)
+		return
+	}
+
 	const stored = await extensionStorageGet(onboardKey)
 	showOnboard(!stored[onboardKey])
+}
+
+const bindGettingStarted = () => {
+	document.querySelectorAll('[data-gs-step]').forEach((btn) => {
+		btn.addEventListener('click', () => setGettingStartedStep(btn.dataset.gsStep))
+	})
+
+	document.querySelectorAll('[data-action="gs-next"]').forEach((btn) => {
+		btn.addEventListener('click', () => setGettingStartedStep(gsStep + 1))
+	})
+
+	document.querySelector('[data-action="gs-finish"]')?.addEventListener('click', finishOnboardAndAnnotate)
+	document.querySelectorAll('[data-action="dismiss-onboard"]').forEach((btn) => {
+		btn.addEventListener('click', dismissOnboard)
+	})
 }
 
 // initial popup load
@@ -1150,7 +1207,7 @@ const initPopup = () => {
 
 	document.querySelector('[data-action="clear-all"]')?.addEventListener('click', clearAllAnnotations)
 	document.querySelector('[data-action="export"]')?.addEventListener('click', exportAllAnnotations)
-	document.querySelector('[data-action="dismiss-onboard"]')?.addEventListener('click', dismissOnboard)
+	bindGettingStarted()
 	document.querySelector('[data-action="view-groups"]')?.addEventListener('click', async () => {
 		await setLibraryView('groups')
 		renderAnnotatedPages()

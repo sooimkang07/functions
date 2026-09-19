@@ -1,5 +1,7 @@
 importScripts('url-match.js', 'safe-storage.js', 'icons.js')
 
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+
 // had to add this back in because chrome won't let the popup switch tabs/windows while it's still open
 // tried doing it directly in popup.js but the focus call didn't do anything
 // the background script runs outside the popup so it can actually take over after the popup closes
@@ -174,6 +176,7 @@ const applyToolbarIcon = async () => {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+	chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 	applyToolbarIcon()
 })
 chrome.runtime.onStartup.addListener(applyToolbarIcon)
