@@ -599,6 +599,37 @@ header {
 		}
 	}
 
+	.popup-notes-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-sm);
+	}
+
+	.popup-new-note {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.35rem 0.7rem !important;
+		border-radius: 0.45rem;
+		background: var(--color-primary) !important;
+		color: var(--color-on-primary) !important;
+		font: var(--fw-semibold) var(--fs-sm) var(--font-ui) !important;
+
+		&:hover {
+			color: var(--color-on-primary) !important;
+			filter: brightness(1.08);
+		}
+
+		&[hidden] {
+			display: none !important;
+		}
+
+		svg {
+			inline-size: 0.875rem;
+			block-size: 0.875rem;
+		}
+	}
+
 	ul {
 		margin: 0;
 		padding-block-start: 0;
