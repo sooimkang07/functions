@@ -210,7 +210,7 @@ body.is-getting-started > footer {
 
 .gs-step {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	gap: 0.625rem;
 	inline-size: 100%;
 	margin: 0;
@@ -243,11 +243,17 @@ body.is-getting-started > footer {
 	flex-shrink: 0;
 	inline-size: 1.125rem;
 	block-size: 1.125rem;
-	margin-block-start: 0.05rem;
+	margin-block-start: 0;
 	border: 1.5px solid #cfcfcf;
 	border-radius: 999px;
 	background: #fff;
 	position: relative;
+}
+
+.gs-step-label {
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: normal;
 }
 
 .gs-step.is-active .gs-step-mark {
@@ -336,6 +342,7 @@ body.is-getting-started > footer {
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-xs);
+	min-inline-size: 0;
 }
 
 .gs-copy h3 {
@@ -343,7 +350,11 @@ body.is-getting-started > footer {
 	font-size: 1.125rem;
 	font-weight: var(--fw-semibold);
 	letter-spacing: -0.02em;
+	line-height: 1.2;
 	color: var(--gs-text);
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: normal;
 }
 
 .gs-copy p {
@@ -351,6 +362,9 @@ body.is-getting-started > footer {
 	font-size: 0.875rem;
 	line-height: 1.4;
 	color: #4b4b57;
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: normal;
 }
 
 .gs-cta {
@@ -402,7 +416,8 @@ body.is-getting-started > footer {
 
 @media (max-width: 28rem) {
 	body.is-getting-started {
-		inline-size: 23rem;
+		inline-size: 26rem;
+		max-inline-size: 100%;
 	}
 
 	.getting-started {
@@ -420,6 +435,18 @@ body.is-getting-started > footer {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 0.125rem;
+	}
+
+	.gs-stage {
+		padding-inline: var(--space-md);
+	}
+
+	.gs-copy h3 {
+		font-size: 1.0625rem;
+	}
+
+	.gs-copy p {
+		font-size: 0.8125rem;
 	}
 }
 
