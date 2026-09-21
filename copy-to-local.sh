@@ -16,7 +16,12 @@ if command -v rsync >/dev/null 2>&1; then
 else
 	rm -rf "$DEST"
 	mkdir -p "$DEST"
-	cp -R "$ROOT/manifest.json" "$ROOT/index.html" "$ROOT/scripts" "$ROOT/styles" "$ROOT/images" "$DEST/"
+	cp -R "$ROOT/manifest.json" "$ROOT/index.html" "$ROOT/welcome.html" "$ROOT/scripts" "$ROOT/styles" "$ROOT/images" "$DEST/"
+fi
+
+# rsync path already copies welcome.html; non-rsync path needs it explicitly above.
+if [[ -f "$ROOT/welcome.html" && ! -f "$DEST/welcome.html" ]]; then
+	cp -f "$ROOT/welcome.html" "$DEST/welcome.html"
 fi
 
 echo "Copied Notate to: $DEST"
@@ -46,6 +51,6 @@ echo "1. Open chrome://extensions"
 echo "2. Turn on Developer mode"
 echo "3. Remove the old unpacked copy if it pointed at Desktop/iCloud"
 echo "4. Load unpacked and choose: $DEST"
-echo "5. Confirm the card says Version 1.19, then click Reload and Clear all on Errors"
+echo "5. Confirm the card says Version 1.20, then click Reload and Clear all on Errors"
 echo
 echo "Chrome needs every extension file on local disk. iCloud cloud-only files will keep breaking Load unpacked."

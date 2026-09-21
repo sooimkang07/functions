@@ -175,9 +175,32 @@ const applyToolbarIcon = async () => {
 	}
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+	if (message?.action !== 'notate-open-side-panel') return
+
+	const open = async () => {
+		try {
+			const current = await chrome.windows.getCurrent()
+			if (current?.id != null) {
+				await chrome.sidePanel.open({ windowId: current.id })
+			}
+		} catch {
+			/* ignore */
+		}
+		sendResponse({ ok: true })
+	}
+
+	open()
+	return true
+})
+
+chrome.runtime.onInstalled.addListener((details) => {
 	chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 	applyToolbarIcon()
+
+	if (details.reason === 'install') {
+		chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }).catch(() => {})
+	}
 })
 chrome.runtime.onStartup.addListener(applyToolbarIcon)
 applyToolbarIcon()
