@@ -1167,14 +1167,14 @@ const finishOnboardAndAnnotate = async () => {
 }
 
 const initOnboard = async () => {
+	// First-run lives on welcome.html ("Welcome to Notate for Chrome"), not the in-panel GS.
 	const forcePreview = /(?:\?|&)onboard=1(?:&|$)/.test(location.search) || location.hash === '#onboard'
 	if (forcePreview) {
 		showOnboard(true)
 		return
 	}
 
-	const stored = await extensionStorageGet(onboardKey)
-	showOnboard(!stored[onboardKey])
+	showOnboard(false)
 }
 
 const bindGettingStarted = () => {

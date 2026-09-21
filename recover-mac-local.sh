@@ -97,5 +97,5 @@ grep -E 'sidePanel|side_panel|default_popup' manifest.json || true
 echo
 echo "=== 5) Chrome ==="
 echo "Remove Notate → Load unpacked → $ROOT"
-echo "If this was the real 1.18 tip, version may read 1.18 (or whatever that commit had)."
-echo "Open chrome-extension://<id>/welcome.html and confirm side panel via toolbar icon."
+echo "Confirm Version 1.21. Side panel = Notes. Welcome tab = Welcome to Notate for Chrome (4 steps)."
+echo "Open chrome-extension://<id>/welcome.html if the welcome tab did not open on install."
