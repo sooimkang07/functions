@@ -97,5 +97,6 @@ grep -E 'sidePanel|side_panel|default_popup' manifest.json || true
 echo
 echo "=== 5) Chrome ==="
 echo "Remove Notate → Load unpacked → $ROOT"
-echo "Confirm Version 1.21. Side panel = Notes. Welcome tab = Welcome to Notate for Chrome (4 steps)."
+echo "Confirm Version 1.23. Side panel = Notes | Clear all | New. Welcome tab = Welcome to Notate for Chrome (4 steps)."
 echo "Open chrome-extension://<id>/welcome.html if the welcome tab did not open on install."
+echo "Going-forward baseline branch: cursor/1.14-welcome-586f (1.14 side panel lineage + ChatGPT welcome)."

@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "Notate",
 	"description": "Annotate specific elements on live pages. Keep what caught your attention, why it mattered, and the original context so you can return later.",
-	"version": "1.22",
+	"version": "1.23",
 	"permissions": [
 		"activeTab",
 		"tabs",
