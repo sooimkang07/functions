@@ -6,17 +6,18 @@ This is V1 of Notate, limited by time and my current skillset. But, I aim to exp
 HOW TO LOAD (IMPORTANT)
 Do not Load unpacked from iCloud Drive, Desktop, or Documents if those folders are iCloud-synced. Chrome reads every extension file from disk. Cloud-only placeholders (the little cloud icons in Finder) make `chrome.storage` fail, keep content scripts from injecting, and force you to wait on iCloud every time you open the project.
 
-The authoritative workspace is `~/notate-extension` on branch `main`. Open this same folder in both Cursor and Codex. Do not copy older project folders over it or switch to historical branches. Recovery archives are stored locally in `recovery/` and are excluded from GitHub.
+Use a copy that stays on this Mac:
 
-1. Open `~/notate-extension` directly in your editor.
-2. Keep routine work on `main`; commit completed changes before switching tools.
+1. Open Terminal in this project folder and run:
+   `chmod +x copy-to-local.sh && ./copy-to-local.sh`
+2. That copies Notate to `~/notate-extension` (your home folder, not iCloud).
 3. In Chrome go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and choose `~/notate-extension`. After later code changes, click **Reload** on Notate. The card should say version **1.14**.
 4. After that, do not use Live Server or open `index.html` in a tab. Click the Notate icon in the Chrome toolbar. It opens a **side panel** that stays open while you scroll and switch pages.
 5. **New** only works on a regular website (`http`/`https`). Chrome’s new tab page, `chrome://extensions`, and the Web Store cannot be marked. Open a website first, or click a saved page in the side panel.
 6. How it works: **New** → click the element that caught your eye → write why it mattered → open **Group** and pick an existing name, or **+ New Group** to name it and pick a color → Save (⌘↩). If a group tab is selected, New starts in that group. The library opens on **All** (newest notes first). Scroll the tabs at the top to filter by group, or drag a named group tab to reorder it. Right-click a named group tab to rename it, change its color, or delete it (notes stay in All). **Done** finishes adding, or puts Notate away. Drag a note to move it while adding.
 7. If the toolbar/popup N icon is missing, the PNGs in `images/` are still iCloud cloud-only files. Right-click `images` → **Download Now** / **Keep Downloaded**, or load from `~/notate-extension`. Click **Clear all** on the Errors page — Chrome keeps old errors after Reload.
 
-Older class/iCloud folders are historical copies. Use the authoritative folder above for editing and loading Chrome.
+If you want to keep working from the class folder instead, in Finder right-click the `functions` folder → **Download Now**, then right-click again → **Keep Downloaded**. That stops macOS from evicting the files back to iCloud. Reloading the unpacked extension after files finish downloading is still required.
 
 GOALS OF THE PROJECT
 * Identify an “actual” problem either in my own life or others and answer this using what we’ve learned in class so far (HTML, CSS, vanilla JS)

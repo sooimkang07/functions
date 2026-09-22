@@ -5,6 +5,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 DEST="${HOME}/notate-extension"
 
+if [ "$ROOT" = "$DEST" ] || [ -e "$DEST/.git" ]; then
+	echo "Notate already has an authoritative workspace at $DEST. Open it directly; copying is disabled to protect current work."
+	exit 0
+fi
+if [ -d "$DEST" ] && [ -n "$(ls -A "$DEST")" ]; then
+	echo "Refusing to overwrite an existing Notate folder: $DEST"
+	exit 1
+fi
+
 mkdir -p "$DEST"
 
 if command -v rsync >/dev/null 2>&1; then

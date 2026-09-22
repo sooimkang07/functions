@@ -1,210 +1,214 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+/* Custom-cursor sites can hide the native cursor while their visual cursor
+   sits behind Notate. Restore native cursors only on our interactive UI.
+   Important also defeats common host-wide `cursor: none !important` rules. */
+:is(#notate-toolbar, #notate-modal) { cursor: default !important; }
+#notate-layer > .notate-note { cursor: pointer !important; }
+:is(#notate-toolbar, #notate-modal, #notate-layer > .notate-note) * { cursor: inherit !important; }
+:is(#notate-toolbar, #notate-modal, #notate-layer > .notate-note) button { cursor: pointer !important; }
+#notate-modal :is(textarea, input:not([type="radio"]):not([type="checkbox"]):not([type="color"])) { cursor: text !important; }
+html:is(.notate-is-moving, .notate-is-previewing) #notate-layer > .notate-note { cursor: grab !important; }
+html:is(.notate-is-moving, .notate-is-annotating, .notate-is-previewing) #notate-layer > .notate-note:active { cursor: grabbing !important; }
 
 /* ---------------ROOT VARIABLES--------------- */
 
-html {
-	font-size: 16px !important;
-	/* have to use !important here to override sites that set their root much smaller so as not to shrink the text*/
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) {
+	--notate-folder-rest: 22%;
+	--notate-folder-hover: 40%;
+	--notate-folder-selected-paper: 60%;
+	--notate-font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
+	--notate-font-note: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+	--notate-fs-sm: 12px;
+	--notate-fs-regular: 14px;
+	--notate-fs-note-md: 16px;
+	--notate-fs-note: 16px;
+	--notate-note-len: 0;
+	--notate-note-len-max: 200;
+
+	--notate-fw-regular: 400;
+	--notate-fw-medium: 500;
+
+	--notate-space-2xs: 4px;
+	--notate-space-xs: 8px;
+	--notate-space-sm: 12px;
+	--notate-space-md: 16px;
+	--notate-space-lg: 24px;
+	--notate-space-xl: 32px;
+
+	--notate-radius-sm: 4px;
+	--notate-radius-md: 8px;
+	--notate-radius-pill: 6px;
+
+	--notate-color-text: #37352F;
+	--notate-color-text-secondary: rgba(55, 53, 47, 0.65);
+	--notate-color-note: #ECDDB5;
+	--notate-color-note-hover: #FBF3DB;
+	--notate-color-note-accent: #DFAB01;
+	--notate-color-note-mint: #C2E9CE;
+	--notate-color-note-sky: #BCE5FE;
+	--notate-color-note-peach: #FDD4BE;
+	--notate-color-note-lilac: #E6D5FC;
+	--notate-color-note-rose: #FCD0E3;
+	--notate-note-bg: var(--notate-color-note);
+	--notate-color-bg: #ffffff;
+	--notate-color-hover: rgba(55, 53, 47, 0.08);
+	--notate-color-active: rgba(55, 53, 47, 0.12);
+	--notate-color-border: rgba(55, 53, 47, 0.09);
+
+	--notate-color-scrim: color-mix(in srgb, #000 40%, transparent);
+	--notate-color-clear: #C4554D;
+	--notate-color-primary: #202124;
+	--notate-color-on-primary: #ffffff;
+
+	--notate-border-ui: 1px solid var(--notate-color-border);
+
+	--notate-shadow-sm: 0 1px 2px rgba(15, 15, 15, 0.05);
+	--notate-shadow-md: 0 14px 28px rgba(15, 15, 15, 0.12), 0 0 0 1px rgba(15, 15, 15, 0.05);
+
+	--notate-outline-annotating: 1.5px solid #8a8a86;
+	--notate-neutral-fill: #F7F7F5;
+	--notate-neutral-accent: #8a8a86;
+	--notate-lh-note: 1.4;
+	--notate-lh-modal: 1.5;
+
+	--notate-ease: cubic-bezier(.25,.1,.25,1);
+	--notate-duration: 80ms;
+	--notate-duration-md: 120ms;
+	--notate-duration-coyote: var(--notate-duration-md);
+
+	--notate-inline-size-note: 256px;
+	--notate-inline-size-modal: 352px;
+	--notate-min-block-modal: 72px;
+	--notate-inline-offset-toolbar: 12px;
+	--notate-blur-toolbar: 12px;
+
+	--notate-layer-z: 1000;
+	--notate-note-z: 1001;
+	--notate-toolbar-z: 1000000000;
 }
 
-:root {
-	--font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
-	--font-note: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
-	--fs-sm: 0.75rem;
-	--fs-regular: 0.875rem;
-	--fs-note-md: 1rem;
-	--fs-note: 1rem;
-	--note-len: 0;
-	--note-len-max: 200;
-
-	--fw-regular: 400;
-	--fw-medium: 500;
-
-	--space-2xs: 0.25rem;
-	--space-xs: 0.5rem;
-	--space-sm: 0.75rem;
-	--space-md: 1rem;
-	--space-lg: 1.5rem;
-	--space-xl: 2rem;
-
-	--radius-sm: 0.25rem;
-	--radius-md: 0.5rem;
-	--radius-pill: 0.375rem;
-
-	--color-text: #37352F;
-	--color-text-secondary: rgba(55, 53, 47, 0.65);
-	--color-note: #FDECC8;
-	--color-note-hover: #FBF3DB;
-	--color-note-accent: #DFAB01;
-	--color-note-mint: #D3F8E4;
-	--color-note-sky: #D3E5EF;
-	--color-note-peach: #F5E0D6;
-	--color-note-lilac: #E8DEEE;
-	--color-note-rose: #F5E0E9;
-	--note-bg: var(--color-note);
-	--color-bg: #ffffff;
-	--color-hover: rgba(55, 53, 47, 0.08);
-	--color-active: rgba(55, 53, 47, 0.12);
-	--color-border: rgba(55, 53, 47, 0.09);
-	--color-focus: #2383E2;
-	--color-scrim: color-mix(in srgb, #000 40%, transparent);
-	--color-clear: #C4554D;
-	--color-primary: #37352F;
-	--color-on-primary: #ffffff;
-
-	--border-ui: 0.0625rem solid var(--color-border);
-
-	--shadow-sm: 0 0.0625rem 0.125rem rgba(15, 15, 15, 0.05);
-	--shadow-md: 0 0.875rem 1.75rem rgba(15, 15, 15, 0.12), 0 0 0 0.0625rem rgba(15, 15, 15, 0.05);
-
-	--outline-annotating: 0.125rem solid var(--color-note-accent);
-	--lh-note: 1.4;
-	--lh-modal: 1.5;
-
-	--ease: cubic-bezier(.25,.1,.25,1);
-	--duration: 80ms;
-	--duration-md: 120ms;
-	--duration-coyote: var(--duration-md);
-
-	--inline-size-note: 16rem;
-	--inline-size-modal: 22rem;
-	--min-block-modal: 4.5rem;
-	--inline-offset-toolbar: 0.75rem;
-	--blur-toolbar: 0.75rem;
-
-	--layer-z: 1000;
-	--note-z: 1001;
-	--toolbar-z: 1000000000;
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="yellow"] {
+	--notate-note-bg: var(--notate-color-note);
 }
 
-[data-color="yellow"] {
-	--note-bg: var(--color-note);
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="mint"] {
+	--notate-note-bg: var(--notate-color-note-mint);
 }
 
-[data-color="mint"] {
-	--note-bg: var(--color-note-mint);
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="sky"] {
+	--notate-note-bg: var(--notate-color-note-sky);
 }
 
-[data-color="sky"] {
-	--note-bg: var(--color-note-sky);
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="peach"] {
+	--notate-note-bg: var(--notate-color-note-peach);
 }
 
-[data-color="peach"] {
-	--note-bg: var(--color-note-peach);
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="lilac"] {
+	--notate-note-bg: var(--notate-color-note-lilac);
 }
 
-[data-color="lilac"] {
-	--note-bg: var(--color-note-lilac);
+:is(#notate-modal, #notate-modal *, #notate-layer > .notate-note)[data-color="rose"] {
+	--notate-note-bg: var(--notate-color-note-rose);
 }
 
-[data-color="rose"] {
-	--note-bg: var(--color-note-rose);
+/* Local baseline. Never reset website elements or their pseudo-elements. */
+:is(#notate-toolbar, #notate-modal, #notate-layer) :where(button, input, textarea, select, menu, li, p, h2, form, section, label, fieldset, legend) {
+	margin: 0;
+	box-sizing: border-box;
+	text-transform: none;
+	letter-spacing: normal;
 }
+#notate-layer { font: 14px/1.4 var(--notate-font-ui); color-scheme: light; }
+#notate-toolbar button, #notate-modal button { text-decoration: none; }
 
 /* ---------------ANNOTATING MODE--------------- */
 
 html {
-	&.is-annotating {
+	&.notate-is-annotating {
 		#notate-toolbar *,
 		#notate-modal *,
-		.notate-note, .notate-note * {
+		#notate-layer > .notate-note, #notate-layer > .notate-note * {
 			cursor: default;
 		}
 
-		.notate-note,
-		.notate-note:hover {
+		#notate-layer > .notate-note,
+		#notate-layer > .notate-note:hover {
 			cursor: pointer;
 		}
 
-		.notate-note:active,
-		.notate-note:active * {
+		#notate-layer > .notate-note:active,
+		#notate-layer > .notate-note:active * {
 			cursor: grabbing;
 		}
 
-		[data-action="edit"] {
-			display: none;
-		}
 
-		[data-action="exit"] {
-			display: none;
-		}
 
-		[data-action="move"],
-		[data-action="clear"] {
+		#notate-toolbar [data-action="move"] {
 			display: none;
 		}
 
 		#notate-toolbar [data-action="preview"] {
-			background: var(--color-primary);
-			color: var(--color-on-primary);
+			background: var(--notate-color-primary);
+			color: var(--notate-color-on-primary);
 
 			&:hover,
 			&:active {
-				background: color-mix(in srgb, var(--color-primary) 88%, #fff);
-				color: var(--color-on-primary);
+				background: color-mix(in srgb, var(--notate-color-primary) 88%, #fff);
+				color: var(--notate-color-on-primary);
 			}
 		}
 	}
 
-	&.is-moving {
-		.notate-note,
-		.notate-note:hover {
+	&.notate-is-moving {
+		#notate-layer > .notate-note,
+		#notate-layer > .notate-note:hover {
 			cursor: grab;
 		}
 
-		.notate-note:active,
-		.notate-note:active * {
+		#notate-layer > .notate-note:active,
+		#notate-layer > .notate-note:active * {
 			cursor: grabbing;
 		}
 
-		[data-action="move"],
-		[data-action="clear"],
-		[data-action="edit"],
-		[data-action="exit"] {
-			display: none;
-		}
-
 		#notate-toolbar [data-action="preview"] {
-			background: var(--color-primary);
-			color: var(--color-on-primary);
+			background: var(--notate-color-primary);
+			color: var(--notate-color-on-primary);
 
 			&:hover,
 			&:active {
-				background: color-mix(in srgb, var(--color-primary) 88%, #fff);
-				color: var(--color-on-primary);
+				background: color-mix(in srgb, var(--notate-color-primary) 88%, #fff);
+				color: var(--notate-color-on-primary);
 			}
 		}
 	}
 
-	&.is-previewing {
-		.notate-note {
+	&.notate-is-previewing {
+		#notate-layer > .notate-note {
 			cursor: pointer;
 		}
 
-		[data-action="preview"] {
+		#notate-toolbar [data-action="preview"] {
 			display: none;
 		}
 
-		[data-action="move"],
-		[data-action="clear"] {
+		#notate-toolbar [data-action="move"] {
 			display: none;
 		}
 
 		#notate-toolbar [data-action="edit"] {
-			background: var(--color-primary);
-			color: var(--color-on-primary);
+			background: var(--notate-color-primary);
+			color: var(--notate-color-on-primary);
 
 			&:hover,
 			&:active {
-				background: color-mix(in srgb, var(--color-primary) 88%, #fff);
-				color: var(--color-on-primary);
+				background: color-mix(in srgb, var(--notate-color-primary) 88%, #fff);
+				color: var(--notate-color-on-primary);
 			}
 		}
 
 		#notate-toolbar [data-action="exit"] {
 			background: transparent;
-			color: var(--color-text);
+			color: var(--notate-color-text);
 		}
 	}
 }
@@ -212,25 +216,25 @@ html {
 /* ---------------HOVER FILL IN ANNOTATING MODE--------------- */
 
 .notate-hover {
-	background-color: color-mix(in srgb, var(--color-note) 30%, transparent);
-	outline: var(--outline-annotating);
-	outline-color: var(--color-note-accent);
-	outline-offset: 0.125rem;
-	border-radius: var(--radius-sm);
+	background-color: color-mix(in srgb, var(--notate-neutral-accent) 32%, transparent);
+	outline: var(--notate-outline-annotating);
+	outline-color: var(--notate-neutral-accent);
+	outline-offset: 2px;
+	border-radius: var(--notate-radius-sm);
 	transition:
-		background-color var(--duration-md) var(--ease),
-		outline-color var(--duration-md) var(--ease);
+		background-color var(--notate-duration-md) var(--notate-ease),
+		outline-color var(--notate-duration-md) var(--notate-ease);
 }
 
 #notate-img-overlay {
 	position: fixed;
-	background: color-mix(in srgb, var(--color-note) 30%, transparent);
+	background: color-mix(in srgb, var(--notate-neutral-accent) 32%, transparent);
 	pointer-events: none;
-	z-index: var(--toolbar-z);
-	outline: var(--outline-annotating);
-	outline-offset: 0.125rem;
-	border-radius: var(--radius-sm);
-	transition: opacity var(--duration-md) var(--ease);
+	z-index: var(--notate-toolbar-z);
+	outline: 1.5px solid var(--notate-neutral-accent);
+	outline-offset: 2px;
+	border-radius: var(--notate-radius-sm);
+	transition: opacity var(--notate-duration-md) var(--notate-ease);
 }
 
 /* ---------------TOOLBAR BUTTONS--------------- */
@@ -238,25 +242,25 @@ html {
 #notate-toolbar {
 	/* so it doesn't inherit styles from the page: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/all */
 	all: initial;
-	font-size: var(--fs-regular);
+	font-size: var(--notate-fs-regular);
 	position: fixed;
-	inset-block-start: var(--inline-offset-toolbar);
-	inset-inline-end: var(--inline-offset-toolbar);
+	inset-block-start: var(--notate-inline-offset-toolbar);
+	inset-inline-end: var(--notate-inline-offset-toolbar);
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: var(--space-2xs);
-	padding: 0.25rem;
-	font-family: var(--font-ui);
+	gap: var(--notate-space-2xs);
+	padding: 4px;
+	font-family: var(--notate-font-ui);
 	inline-size: max-content;
-	max-inline-size: calc(100vw - (var(--space-md) * 2));
+	max-inline-size: calc(100vw - (var(--notate-space-md) * 2));
 	box-sizing: border-box;
-	z-index: var(--toolbar-z);
+	z-index: var(--notate-toolbar-z);
 	color-scheme: light;
-	background: var(--color-bg);
-	border: var(--border-ui);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-md);
+	background: var(--notate-color-bg);
+	border: var(--notate-border-ui);
+	border-radius: var(--notate-radius-md);
+	box-shadow: var(--notate-shadow-md);
 
 	&[hidden] {
 		display: none;
@@ -264,12 +268,12 @@ html {
 
 	> p {
 		margin: 0;
-		padding-inline: var(--space-xs);
-		font-family: var(--font-ui);
-		font-size: var(--fs-sm);
-		font-weight: var(--fw-medium);
+		padding-inline: var(--notate-space-xs);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-sm);
+		font-weight: var(--notate-fw-medium);
 		line-height: 1.3;
-		color: var(--color-text-secondary);
+		color: var(--notate-color-text-secondary);
 		flex: 1 1 auto;
 
 		&:empty {
@@ -281,7 +285,7 @@ html {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.125rem;
+		gap: 2px;
 		margin: 0;
 		padding: 0;
 
@@ -299,31 +303,41 @@ html {
 	}
 
 	.notate-toolbar-button {
-		padding-block: 0.375rem;
-		padding-inline: 0.625rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--notate-space-2xs);
+		svg { inline-size: 12px; block-size: 12px; }
+		&[data-action="edit"] {
+			background: var(--notate-color-primary);
+			color: var(--notate-color-on-primary);
+			&:hover { background: color-mix(in srgb, var(--notate-color-primary) 88%, #fff); }
+		}
+		padding-block: 6px;
+		padding-inline: 10px;
 		border: none;
-		border-radius: var(--radius-sm);
+		border-radius: var(--notate-radius-sm);
 		background: transparent;
-		color: var(--color-text);
+		color: var(--notate-color-text);
 		cursor: pointer;
-		font-family: var(--font-ui);
-		font-size: var(--fs-sm);
-		font-weight: var(--fw-medium);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-sm);
+		font-weight: var(--notate-fw-medium);
 		line-height: 1.3;
 		white-space: nowrap;
-		transition: background-color var(--duration) var(--ease);
+		transition: background-color var(--notate-duration) var(--notate-ease);
 
 		&:hover {
-			background: var(--color-hover);
+			background: var(--notate-color-hover);
 		}
 
 		&:active {
-			background: var(--color-active);
+			background: var(--notate-color-active);
 		}
 
 		&:focus-visible {
-			outline: 0.125rem solid var(--color-focus);
-			outline-offset: 0.125rem;
+			outline: 2px solid currentColor;
+			outline-offset: 2px;
 		}
 
 		&[data-action="move"],
@@ -337,25 +351,25 @@ html {
 
 #notate-modal {
 	all: initial;
-	font-size: var(--fs-regular);
+	font-size: var(--notate-fs-regular);
 	position: fixed;
 	inset-block-start: 50%;
 	inset-inline-start: 50%;
 	translate: -50% -50%;
-	inline-size: min(var(--inline-size-modal), calc(100vw - var(--space-xl)));
-	max-inline-size: calc(100vw - var(--space-xl));
-	min-block-size: var(--min-block-modal);
-	max-block-size: calc(100vh - var(--space-xl));
-	padding: var(--space-sm);
-	border-radius: var(--radius-md);
+	inline-size: min(var(--notate-inline-size-modal), calc(100vw - var(--notate-space-xl)));
+	max-inline-size: calc(100vw - var(--notate-space-xl));
+	min-block-size: var(--notate-min-block-modal);
+	max-block-size: calc(100vh - var(--notate-space-xl));
+	padding: var(--notate-space-sm);
+	border-radius: var(--notate-radius-md);
 	box-sizing: border-box;
-	background: var(--color-bg);
-	border: var(--border-ui);
+	background: var(--notate-color-bg);
+	border: var(--notate-border-ui);
 	outline: none;
-	box-shadow: var(--shadow-md);
+	box-shadow: var(--notate-shadow-md);
 	overflow: auto;
 	overflow-wrap: anywhere;
-	font-family: var(--font-ui);
+	font-family: var(--notate-font-ui);
 	color-scheme: light;
 
 	&:not([open]) {
@@ -363,14 +377,14 @@ html {
 	}
 
 	&::backdrop {
-		background: var(--color-scrim);
+		background: var(--notate-color-scrim);
 	}
 
 	form {
 		block-size: 100%;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-sm);
+		gap: var(--notate-space-sm);
 		min-inline-size: 0;
 		max-inline-size: 100%;
 	}
@@ -379,36 +393,36 @@ html {
 		display: flex;
 		flex: 1;
 		flex-direction: column;
-		gap: var(--space-sm);
+		gap: var(--notate-space-sm);
 		min-block-size: 0;
 	}
 
 	section[data-screen="group"] {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-sm);
+		gap: var(--notate-space-sm);
 
-		input {
+		input[name="annotation-group"] {
 			inline-size: 100%;
 			max-inline-size: 100%;
 			min-inline-size: 0;
 			box-sizing: border-box;
-			padding-block: 0.375rem;
-			padding-inline: var(--space-xs);
-			border: var(--border-ui);
-			border-radius: var(--radius-sm);
-			background: var(--color-bg);
-			font: var(--fw-regular) var(--fs-regular) var(--font-ui);
-			color: var(--color-text);
+			padding-block: 6px;
+			padding-inline: var(--notate-space-xs);
+			border: var(--notate-border-ui);
+			border-radius: var(--notate-radius-sm);
+			background: var(--notate-color-bg);
+			font: var(--notate-fw-regular) var(--notate-fs-regular) var(--notate-font-ui);
+			color: var(--notate-color-text);
 
 			&:focus,
 			&:focus-visible {
-				outline: 0.125rem solid var(--color-focus);
-				outline-offset: 0.125rem;
+				outline: 2px solid currentColor;
+				outline-offset: 2px;
 			}
 
 			&::placeholder {
-				color: var(--color-text-secondary);
+				color: var(--notate-color-text-secondary);
 			}
 		}
 	}
@@ -420,29 +434,29 @@ html {
 
 	h2 {
 		margin: 0;
-		font-family: var(--font-ui);
-		font-size: var(--fs-note-md);
-		font-weight: var(--fw-medium);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-note-md);
+		font-weight: var(--notate-fw-medium);
 		line-height: 1.2;
-		color: var(--color-text);
+		color: var(--notate-color-text);
 	}
 
 	form > p {
 		margin: 0;
-		font-family: var(--font-ui);
-		font-size: var(--fs-regular);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-regular);
 		line-height: 1.4;
-		color: var(--color-text-secondary);
+		color: var(--notate-color-text-secondary);
 	}
 
 	section[data-screen="note"] > label {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2xs);
-		font-family: var(--font-ui);
-		font-size: var(--fs-sm);
-		font-weight: var(--fw-medium);
-		color: var(--color-text-secondary);
+		gap: var(--notate-space-2xs);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-sm);
+		font-weight: var(--notate-fw-medium);
+		color: var(--notate-color-text-secondary);
 
 		input,
 		select {
@@ -450,23 +464,23 @@ html {
 			max-inline-size: 100%;
 			min-inline-size: 0;
 			box-sizing: border-box;
-			padding-block: 0.375rem;
-			padding-inline: var(--space-xs);
-			border: var(--border-ui);
-			border-radius: var(--radius-sm);
-			background: var(--color-bg);
-			font: var(--fw-regular) var(--fs-regular) var(--font-ui);
-			color: var(--color-text);
+			padding-block: 6px;
+			padding-inline: var(--notate-space-xs);
+			border: var(--notate-border-ui);
+			border-radius: var(--notate-radius-sm);
+			background: var(--notate-color-bg);
+			font: var(--notate-fw-regular) var(--notate-fs-regular) var(--notate-font-ui);
+			color: var(--notate-color-text);
 			appearance: auto;
 
 			&:focus,
 			&:focus-visible {
-				outline: 0.125rem solid var(--color-focus);
-				outline-offset: 0.125rem;
+				outline: 2px solid currentColor;
+				outline-offset: 2px;
 			}
 
 			&::placeholder {
-				color: var(--color-text-secondary);
+				color: var(--notate-color-text-secondary);
 			}
 		}
 
@@ -479,7 +493,7 @@ html {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-xs);
+		gap: var(--notate-space-xs);
 		margin: 0;
 		padding: 0;
 		border: none;
@@ -487,28 +501,28 @@ html {
 
 		legend {
 			inline-size: 100%;
-			margin-block-end: var(--space-2xs);
-			font-family: var(--font-ui);
-			font-size: var(--fs-sm);
-			font-weight: var(--fw-medium);
-			color: var(--color-text-secondary);
+			margin-block-end: var(--notate-space-2xs);
+			font-family: var(--notate-font-ui);
+			font-size: var(--notate-fs-sm);
+			font-weight: var(--notate-fw-medium);
+			color: var(--notate-color-text-secondary);
 		}
 
 		&:has([name="annotation-color"]) label {
 			position: relative;
-			inline-size: 1.25rem;
-			block-size: 1.25rem;
-			border-radius: var(--radius-pill);
-			background: var(--note-bg, var(--color-note));
+			inline-size: 20px;
+			block-size: 20px;
+			border-radius: var(--notate-radius-pill);
+			background: var(--notate-note-bg, var(--notate-color-note));
 			box-shadow:
-				0 0 0 0.125rem var(--color-bg),
-				inset 0 0 0 0.0625rem color-mix(in srgb, #000 16%, transparent);
+				0 0 0 2px var(--notate-color-bg),
+				inset 0 0 0 1px color-mix(in srgb, #000 16%, transparent);
 			cursor: pointer;
 
 			&:has(:checked),
 			&:focus-within {
-				outline: 0.125rem solid var(--color-text);
-				outline-offset: 0.125rem;
+				outline: 2px solid var(--notate-color-text);
+				outline-offset: 2px;
 			}
 
 			input {
@@ -523,19 +537,19 @@ html {
 		&:has([name="annotation-state"]) label {
 			display: inline-flex;
 			align-items: center;
-			gap: var(--space-2xs);
-			padding-block: var(--space-2xs);
-			padding-inline: var(--space-xs);
-			border-radius: var(--radius-pill);
-			background: var(--color-bg);
-			font-family: var(--font-ui);
-			font-size: var(--fs-sm);
+			gap: var(--notate-space-2xs);
+			padding-block: var(--notate-space-2xs);
+			padding-inline: var(--notate-space-xs);
+			border-radius: var(--notate-radius-pill);
+			background: var(--notate-color-bg);
+			font-family: var(--notate-font-ui);
+			font-size: var(--notate-fs-sm);
 			cursor: pointer;
 
 			&:has(:checked),
 			&:focus-within {
-				outline: 0.125rem solid var(--color-text);
-				outline-offset: 0.125rem;
+				outline: 2px solid var(--notate-color-text);
+				outline-offset: 2px;
 			}
 
 			input {
@@ -549,22 +563,23 @@ html {
 		inline-size: 100%;
 		max-inline-size: 100%;
 		min-inline-size: 0;
-		min-block-size: var(--min-block-modal);
-		padding: var(--space-xs);
+		min-block-size: min(192px, 40vh);
+		block-size: min(192px, 40vh);
+		padding: 0;
 		box-sizing: border-box;
 		resize: none;
 		background: transparent;
-		font-family: var(--font-note);
-		font-size: var(--fs-regular);
-		line-height: var(--lh-modal);
-		color: var(--color-text);
+		font-family: var(--notate-font-note);
+		font-size: var(--notate-fs-regular);
+		line-height: var(--notate-lh-modal);
+		color: var(--notate-color-text);
 		border: none;
 		box-shadow: none;
 		appearance: none;
 		scrollbar-width: none;
 
 		&::placeholder {
-			color: var(--color-text-secondary);
+			color: var(--notate-color-text-secondary);
 			opacity: 0.8;
 		}
 
@@ -584,7 +599,7 @@ html {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: flex-end;
-		gap: var(--space-xs);
+		gap: var(--notate-space-xs);
 		padding: 0;
 		margin: 0;
 		max-inline-size: 100%;
@@ -595,47 +610,47 @@ html {
 	}
 
 	button {
-		padding-block: 0.375rem;
-		padding-inline: 0.625rem;
+		padding-block: 6px;
+		padding-inline: 10px;
 		box-sizing: border-box;
 		border: none;
-		border-radius: var(--radius-sm);
+		border-radius: var(--notate-radius-sm);
 		background: transparent;
-		color: var(--color-text);
+		color: var(--notate-color-text);
 		cursor: pointer;
-		font-family: var(--font-ui);
-		font-size: var(--fs-sm);
-		font-weight: var(--fw-medium);
+		font-family: var(--notate-font-ui);
+		font-size: var(--notate-fs-sm);
+		font-weight: var(--notate-fw-medium);
 		line-height: 1.3;
-		transition: background-color var(--duration) var(--ease);
+		transition: background-color var(--notate-duration) var(--notate-ease);
 
 		&:hover {
-			background: var(--color-hover);
+			background: var(--notate-color-hover);
 		}
 
 		&:active {
-			background: var(--color-active);
+			background: var(--notate-color-active);
 		}
 
 		&:focus-visible {
-			outline: 0.125rem solid var(--color-focus);
-			outline-offset: 0.125rem;
+			outline: 2px solid currentColor;
+			outline-offset: 2px;
 		}
 
 		&[value="save"],
 		&[data-action="confirm-group"] {
-			background: var(--color-primary);
-			color: var(--color-on-primary);
+			background: var(--notate-color-primary);
+			color: var(--notate-color-on-primary);
 
 			&:hover,
 			&:active {
-				background: color-mix(in srgb, var(--color-primary) 88%, #fff);
-				color: var(--color-on-primary);
+				background: color-mix(in srgb, var(--notate-color-primary) 88%, #fff);
+				color: var(--notate-color-on-primary);
 			}
 
 			kbd {
-				margin-inline-start: var(--space-xs);
-				font: var(--fw-medium) var(--fs-sm) var(--font-ui);
+				margin-inline-start: var(--notate-space-xs);
+				font: var(--notate-fw-medium) var(--notate-fs-sm) var(--notate-font-ui);
 				opacity: 0.72;
 			}
 		}
@@ -648,7 +663,7 @@ html {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
-	z-index: var(--layer-z);
+	z-index: var(--notate-layer-z);
 
 	&[hidden] {
 		display: none;
@@ -657,40 +672,40 @@ html {
 
 /* ---------------SAVED ANNOTATIONS--------------- */
 
-.notate-note {
+#notate-layer > .notate-note {
 	position: absolute;
-	inline-size: min(var(--inline-size-note), calc(100vw - (var(--space-md) * 2)));
-	max-inline-size: calc(100vw - (var(--space-md) * 2));
-	padding: var(--space-sm);
-	background: var(--note-bg, var(--color-note));
-	border-radius: var(--radius-sm);
-	color: var(--color-text);
+	inline-size: max-content;
+	max-inline-size: min(var(--notate-inline-size-note), calc(100vw - (var(--notate-space-md) * 2)));
+	padding: var(--notate-space-sm);
+	background: var(--notate-note-bg, var(--notate-color-note));
+	border-radius: var(--notate-radius-sm);
+	color: var(--notate-color-text);
 	pointer-events: auto;
-	z-index: var(--note-z);
+	z-index: var(--notate-note-z);
 	box-sizing: border-box;
 	overflow-wrap: anywhere;
 	word-break: break-word;
 	overflow: hidden;
 	border: none;
 	outline: none;
-	box-shadow: var(--shadow-sm);
-	transition: background-color var(--duration) var(--ease);
+	box-shadow: var(--notate-shadow-sm);
+	transition: background-color var(--notate-duration) var(--notate-ease);
 
 	&:hover {
-		background: color-mix(in srgb, var(--note-bg, var(--color-note)) 80%, #fff);
+		background: color-mix(in srgb, var(--notate-note-bg, var(--notate-color-note)) 80%, #fff);
 	}
 
 	p {
 		margin: 0;
-		padding-inline-end: var(--space-lg);
-		font-family: var(--font-note);
+		padding-inline-end: var(--notate-space-lg);
+		font-family: var(--notate-font-note);
 		font-size: clamp(
-			var(--fs-regular),
-			calc(var(--fs-note) - ((var(--fs-note) - var(--fs-regular)) * min(var(--note-len) / var(--note-len-max), 1))),
-			var(--fs-note)
+			var(--notate-fs-regular),
+			calc(var(--notate-fs-note) - ((var(--notate-fs-note) - var(--notate-fs-regular)) * min(var(--notate-note-len) / var(--notate-note-len-max), 1))),
+			var(--notate-fs-note)
 		);
-		line-height: var(--lh-note);
-		color: var(--color-text);
+		line-height: var(--notate-lh-note);
+		color: var(--notate-color-text);
 		overflow-wrap: anywhere;
 		word-break: break-word;
 	}
@@ -701,31 +716,31 @@ html {
 
 	.notate-delete {
 		position: absolute;
-		inset-block-start: var(--space-2xs);
-		inset-inline-end: var(--space-2xs);
-		padding: var(--space-2xs);
+		inset-block-start: var(--notate-space-2xs);
+		inset-inline-end: var(--notate-space-2xs);
+		padding: var(--notate-space-2xs);
 		background: transparent;
 		cursor: pointer;
-		font-family: var(--font-ui);
+		font-family: var(--notate-font-ui);
 		line-height: 1;
-		color: var(--color-text-secondary);
+		color: var(--notate-color-text-secondary);
 		border: none;
 		outline: none;
-		border-radius: var(--radius-sm);
+		border-radius: var(--notate-radius-sm);
 		opacity: 0;
 		transition:
-			opacity var(--duration) var(--ease),
-			background-color var(--duration) var(--ease);
+			opacity var(--notate-duration) var(--notate-ease),
+			background-color var(--notate-duration) var(--notate-ease);
 
 		&:hover {
 			opacity: 1;
-			background: var(--color-hover);
-			color: var(--color-text);
+			background: var(--notate-color-hover);
+			color: var(--notate-color-text);
 		}
 
 		&:focus-visible {
 			opacity: 1;
-			outline: 0.125rem solid var(--color-focus);
+			outline: 2px solid currentColor;
 		}
 	}
 
@@ -736,31 +751,295 @@ html {
 
 /* ---------------ANNOTATED OUTLINE--------------- */
 
-.is-annotated {
-	outline: var(--outline-annotating);
-	outline-offset: 0.125rem;
-	border-radius: var(--radius-sm);
+.notate-annotated {
+	outline: var(--notate-outline-annotating);
+	outline-offset: 2px;
+	border-radius: var(--notate-radius-sm);
 }
 
 /* ---------------ACCESSIBILITY--------------- */
 
 @media (prefers-reduced-motion: reduce) {
-	*, *::before, *::after {
+	:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay),
+	:is(#notate-toolbar, #notate-modal, #notate-layer) * {
 		transition: none;
 		animation: none;
 	}
 }
 
 @media (prefers-contrast: more) {
-	:root {
-		--outline-annotating: 0.1875rem solid #b8860b;
-		--color-note-accent: #b8860b;
-		--color-scrim: color-mix(in srgb, #000 60%, transparent);
-		--color-focus: #0B6E99;
+	:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) {
+		--notate-outline-annotating: 3px solid #b8860b;
+		--notate-color-note-accent: #b8860b;
+		--notate-color-scrim: color-mix(in srgb, #000 60%, transparent);
+
 	}
 
-	.notate-toolbar-button,
+	#notate-toolbar .notate-toolbar-button,
 	#notate-modal button {
-		outline: 0.0625rem solid var(--color-border);
+		outline: 1px solid var(--notate-color-border);
 	}
+}
+
+/* One folder per note; select the active folder again to remove membership. */
+#notate-modal .notate-group-picker {
+	--notate-folder-control-height: 28px;
+	display: flex;
+	align-items: center;
+	gap: var(--notate-space-2xs);
+	min-inline-size: 0;
+	font: var(--notate-fw-medium) var(--notate-fs-sm) var(--notate-font-ui);
+}
+#notate-modal .notate-group-picker [hidden] { display: none !important; }
+#notate-modal .notate-group-picker button {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	padding: 4px 8px;
+	border: none;
+	border-radius: var(--notate-radius-sm);
+	background: transparent;
+	color: var(--notate-color-text);
+	font: inherit;
+	white-space: nowrap;
+	cursor: pointer;
+	box-sizing: border-box;
+	block-size: var(--notate-folder-control-height);
+}
+#notate-modal .notate-group-picker button:hover { background: var(--notate-color-hover); }
+#notate-modal .notate-group-picker button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+#notate-modal .notate-group-picker button[data-group-choice][data-color] { background: var(--notate-note-bg); color: #000; }
+#notate-modal .notate-group-picker button[data-group-choice][data-color]:hover {
+	background: color-mix(in srgb, var(--notate-note-bg) var(--notate-folder-selected-paper), white);
+	color: var(--notate-color-text-secondary);
+}
+#notate-modal .notate-group-picker button[data-group-choice][data-color][aria-pressed="true"],
+#notate-modal .notate-group-picker button[data-group-choice][data-color][aria-pressed="true"]:hover {
+	background: color-mix(in srgb, var(--notate-note-bg) var(--notate-folder-selected-paper), white);
+	box-shadow: none;
+	font-weight: inherit;
+	color: #000;
+}
+#notate-modal .notate-group-menu {
+	display: flex;
+	align-items: center;
+	gap: var(--notate-space-2xs);
+	min-inline-size: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+	padding-block: var(--notate-space-2xs);
+}
+
+/* No folder: neutral card, never the yellow folder's identity. */
+#notate-layer > .notate-note[data-color="neutral"] { --notate-note-bg: var(--notate-neutral-fill); }
+#notate-layer > .notate-note:hover {
+	background: color-mix(in srgb, var(--notate-note-bg) 94%, var(--notate-color-text));
+}
+#notate-layer > .notate-note:focus-within { box-shadow: var(--notate-shadow-sm), 0 0 0 1px var(--notate-neutral-accent); }
+
+/* All saved cards share a subtle boundary; only folder membership adds color. */
+#notate-layer > .notate-note { border: 1px solid rgba(55,53,47,0.18); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+#notate-layer > .notate-note[data-color="neutral"]:hover { background: #f4f4f2; }
+#notate-modal .notate-group-menu::-webkit-scrollbar { display: none; }
+#notate-toolbar .notate-toolbar-button[data-action="clear"] { display: inline-flex; color: var(--notate-color-text-secondary); }
+#notate-toolbar .notate-toolbar-button[data-action="clear"]:hover { color: #a33632; }
+
+#notate-modal .notate-group-menu.has-selection { position:relative; overflow:visible; padding-inline-end:8px; }
+#notate-modal .notate-group-menu .notate-folder-remove { position:absolute; top:-3px; right:0; width:18px; height:18px; padding:0; justify-content:center; border-radius:50%; background:#fff; box-shadow:var(--notate-shadow-sm); opacity:0; }
+#notate-modal .notate-group-menu.has-selection:hover .notate-folder-remove,
+#notate-modal .notate-group-menu.has-selection:focus-within .notate-folder-remove { opacity:1; }
+
+/* Preview the folder color while writing; group creation remains a neutral form. */
+#notate-modal[data-screen="note"][data-color] { background: var(--notate-note-bg); }
+#notate-modal[data-screen="note"][data-color="neutral"] { background: var(--notate-neutral-fill); }
+
+/* Saved target outlines inherit folder identity; ungrouped remains neutral. */
+.notate-annotated[data-notate-outline-color="yellow"] { outline-color: var(--notate-border-yellow); }
+.notate-annotated[data-notate-outline-color="mint"] { outline-color: var(--notate-border-mint); }
+.notate-annotated[data-notate-outline-color="sky"] { outline-color: var(--notate-border-sky); }
+.notate-annotated[data-notate-outline-color="peach"] { outline-color: var(--notate-border-peach); }
+.notate-annotated[data-notate-outline-color="lilac"] { outline-color: var(--notate-border-lilac); }
+.notate-annotated[data-notate-outline-color="rose"] { outline-color: var(--notate-border-rose); }
+.notate-annotated[data-notate-outline-color="neutral"] { outline-color: var(--notate-neutral-accent); }
+
+#notate-toolbar .notate-toolbar-button kbd { font: inherit; font-size: 10px; color: var(--notate-color-text-secondary); }
+
+#notate-layer > .notate-note { transform-origin: right center; }
+
+#notate-note-target-preview {
+	position: fixed;
+	pointer-events: none;
+	background: color-mix(in srgb, var(--notate-preview-color) var(--notate-preview-opacity, 15%), transparent);
+	outline: 1.5px solid var(--notate-preview-border, var(--notate-preview-color));
+	outline-offset: 2px;
+	border-radius: var(--notate-radius-sm);
+}
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-yellow: color-mix(in srgb, var(--notate-color-note) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="yellow"] { border-color: var(--notate-border-yellow); }
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-mint: color-mix(in srgb, var(--notate-color-note-mint) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="mint"] { border-color: var(--notate-border-mint); }
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-sky: color-mix(in srgb, var(--notate-color-note-sky) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="sky"] { border-color: var(--notate-border-sky); }
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-peach: color-mix(in srgb, var(--notate-color-note-peach) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="peach"] { border-color: var(--notate-border-peach); }
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-lilac: color-mix(in srgb, var(--notate-color-note-lilac) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="lilac"] { border-color: var(--notate-border-lilac); }
+
+:is(#notate-toolbar, #notate-modal, #notate-layer, #notate-img-overlay, .notate-annotated) { --notate-border-rose: color-mix(in srgb, var(--notate-color-note-rose) 82%, #37352f); }
+#notate-layer > .notate-note[data-color="rose"] { border-color: var(--notate-border-rose); }
+
+/* Clip the paper surface, not the shadow: the outer filter follows its alpha. */
+#notate-layer > .notate-note {
+ --notate-fold-size: 18px;
+ --notate-paper-border: 1px;
+ border-width: var(--notate-paper-border);
+ border-color: transparent !important;
+ background: transparent;
+ box-shadow: none;
+ overflow: visible;
+ isolation: isolate;
+ filter: drop-shadow(0 2px 4px #0003);
+}
+#notate-layer > .notate-note:hover,
+#notate-layer > .notate-note[data-color="neutral"]:hover {
+ background: transparent;
+}
+#notate-layer > .notate-note:focus-within {
+ box-shadow: none;
+ outline: 1px solid var(--notate-neutral-accent);
+}
+#notate-layer > .notate-note::before {
+ content: "";
+ position: absolute;
+ inset: calc(-1 * var(--notate-paper-border));
+ border-radius: inherit;
+ background: var(--notate-note-bg);
+ border: var(--notate-paper-border) solid color-mix(in srgb, var(--notate-note-bg) 82%, #37352f);
+ box-sizing: border-box;
+ clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--notate-fold-size)), calc(100% - var(--notate-fold-size)) 100%, 0 100%);
+ z-index: -1;
+ pointer-events: none;
+ transition: background-color var(--notate-duration) var(--notate-ease);
+}
+#notate-layer > .notate-note:hover::before {
+ background: color-mix(in srgb, var(--notate-note-bg) 94%, var(--notate-color-text));
+}
+
+#notate-layer > .notate-note::after {
+ content: "";
+ position: absolute;
+ right: calc(-1 * var(--notate-paper-border));
+ bottom: calc(-1 * var(--notate-paper-border));
+ width: var(--notate-fold-size);
+ height: var(--notate-fold-size);
+ background: color-mix(in srgb, var(--notate-note-bg) 72%, #37352f);
+ clip-path: polygon(0 0, 100% 0, 0 100%);
+ border-top-left-radius: var(--notate-radius-sm);
+ pointer-events: none;
+}
+
+#notate-modal [data-missing-target] {
+ margin: 0 0 var(--notate-space-sm);
+ padding: var(--notate-space-xs);
+ border-radius: var(--notate-radius-sm);
+ background: rgba(55,53,47,.06);
+ color: var(--notate-color-text);
+ font: 12px/1.45 var(--notate-font-ui);
+}
+#notate-modal [data-missing-target][hidden] { display: none; }
+
+/* A separate, dismissible notice below the toolbar; never affects its width. */
+#notate-toolbar > [data-storage-error] {
+ position: absolute;
+ top: calc(100% + var(--notate-space-xs));
+ right: 0;
+ width: min(320px, calc(100vw - 32px));
+ box-sizing: border-box;
+ padding: 12px 36px 12px 12px;
+ border: var(--notate-border-ui);
+ border-radius: var(--notate-radius-md);
+ background: var(--notate-color-bg);
+ color: var(--notate-color-text);
+ box-shadow: var(--notate-shadow-md);
+ white-space: normal;
+}
+#notate-toolbar > [data-storage-error] p {
+ display: block;
+ margin: 0;
+ padding: 0;
+ font: 12px/1.45 var(--notate-font-ui);
+ color: var(--notate-color-text-secondary);
+}
+#notate-toolbar .notate-notice-dismiss {
+ position: absolute;
+ right: 6px;
+ top: 6px;
+ width: 24px;
+ height: 24px;
+ padding: 0;
+ border: 0;
+ border-radius: var(--notate-radius-sm);
+ background: transparent;
+ color: var(--notate-color-text);
+ font: 18px/1 var(--notate-font-ui);
+}
+#notate-toolbar .notate-notice-edit {
+ margin-top: 8px;
+ padding: 4px 8px;
+ border: 0;
+ border-radius: var(--notate-radius-sm);
+ background: var(--notate-color-hover);
+ color: var(--notate-color-text);
+ font: 500 12px/1.4 var(--notate-font-ui);
+}
+#notate-toolbar .notate-notice-dismiss:hover { background: var(--notate-color-hover); }
+#notate-toolbar > [data-storage-error] button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+#notate-layer .notate-note > [data-missing-note-warning] {
+ position: relative;
+ display: flex;
+ align-items: flex-start;
+ gap: 6px;
+ margin: 10px 0 0;
+ padding: 0;
+ border: 0;
+ background: transparent;
+ color: var(--notate-color-text-secondary);
+ font: 400 11px/1.4 var(--notate-font-ui);
+ cursor: default !important;
+}
+#notate-layer [data-missing-note-warning] .notate-warning-icon {
+ display: inline-flex;
+ flex: 0 0 14px;
+ margin-top: 1px;
+}
+
+/* The precise pencil tip is only active while picking webpage targets.
+   Exclude all owned UI and pause picking cursors while a dialog is open. */
+html.notate-is-annotating:not(:has(#notate-modal[open], #notate-confirm-host)) body *:not(:is(#notate-toolbar, #notate-toolbar *, #notate-modal, #notate-modal *, #notate-layer, #notate-layer *, #notate-confirm-host, #notate-confirm-host *, #notate-img-overlay)) {
+ cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20d%3D%22M5%2026l2-8L21%204a3%203%200%200%201%204%200l3%203a3%203%200%200%201%200%204L14%2025l-9%202Z%22%20fill%3D%22%23202124%22%20stroke%3D%22white%22%20stroke-width%3D%221%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m8%2018%206%206M20%206l6%206M6%2025l4-1%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E") 5 27, crosshair !important;
+}
+
+/* Keep the remove control neutral; reveal it on hover or keyboard focus. */
+#notate-modal .notate-group-menu .notate-folder-remove {
+ background: #fff;
+ color: var(--notate-color-text);
+}
+
+#notate-modal .notate-group-menu .notate-folder-remove:hover { background: var(--notate-color-hover); }
+
+#notate-modal .notate-group-menu.has-selection:hover .notate-folder-remove,
+#notate-modal .notate-group-menu.has-selection:focus-within .notate-folder-remove {
+ opacity: 1;
+ color: #202124;
+ background: #fff;
+}
+
+#notate-modal .notate-group-menu.has-selection .notate-folder-remove:hover {
+ background: #e8e8e6;
 }

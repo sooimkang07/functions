@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Notate — missing element preview</title><link rel="stylesheet" href="../styles/webpage.css"><style>body{font:16px system-ui;margin:48px;color:#37352f;background:#f4f5f6}h1{font-size:24px}button{font:inherit}#notate-modal{inset:50% auto auto 50%;translate:-50% -50%}</style><h1>This page has changed</h1><p>The element originally annotated has been removed.</p><button id="open-note">Open saved note</button><aside id="notate-toolbar"><menu class="notate-toolbar-group"><li><button class="notate-toolbar-button">Clear all</button></li><li><button class="notate-toolbar-button">Done</button></li><li><button class="notate-toolbar-button">New</button></li></menu></aside><div id="notate-layer"><aside class="notate-note" data-color="sky" style="position:absolute;top:260px;left:120px"><p>Revisit this section’s layout.</p><aside data-missing-note-warning role="status"><span class="notate-warning-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m10.3 3.9-8.1 14a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3l-8.1-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg></span><span>The original element is no longer available.</span></aside></aside></div><dialog id="notate-modal" data-screen="note" data-color="neutral">
+		<form method="dialog">
+			<section data-screen="note">
+				<p data-missing-target role="status" hidden><strong>Original element unavailable</strong><br>The page may have changed. Your note is saved, and you can still edit it here.</p>
+				<textarea id="annotation-text" name="annotation-text" aria-label="New note" placeholder="New note">Make this introduction clearer and more welcoming.</textarea>
+				<div class="notate-group-picker">
+					<select name="annotation-group-choice" aria-label="Choose a folder" hidden></select>
+					<button type="button" data-action="choose-group" aria-label="New folder" title="New folder"></button>
+					<div class="notate-group-menu" aria-label="Folders"></div>
+				</div>
+			</section>
+			<section data-screen="group" hidden>
+				<input name="annotation-group" placeholder="Folder name" aria-label="Folder name" autocomplete="off">
+			<fieldset>
+				<legend>Color</legend>
+				<label data-color="yellow">
+					<input type="radio" name="annotation-color" value="yellow" aria-label="Yellow" checked>
+				</label>
+				<label data-color="mint">
+					<input type="radio" name="annotation-color" value="mint" aria-label="Mint">
+				</label>
+				<label data-color="sky">
+					<input type="radio" name="annotation-color" value="sky" aria-label="Sky">
+				</label>
+				<label data-color="peach">
+					<input type="radio" name="annotation-color" value="peach" aria-label="Peach">
+				</label>
+				<label data-color="lilac">
+					<input type="radio" name="annotation-color" value="lilac" aria-label="Lilac">
+				</label>
+				<label data-color="rose">
+					<input type="radio" name="annotation-color" value="rose" aria-label="Rose">
+				</label>
+			</fieldset>
+			</section>
+			<menu data-note-actions>
+				<li>
+					<button type="submit" name="intent" value="cancel">Cancel</button>
+				</li>
+				<li>
+					<button type="submit" name="intent" value="save" aria-keyshortcuts="Meta+Enter Control+Enter" title="Save (⌘ Enter / Ctrl Enter)">Save <kbd aria-hidden="true">⌘ ↵</kbd></button>
+				</li>
+			</menu>
+			<menu data-group-actions hidden>
+				<li>
+					<button type="button" data-action="back-note">Back</button>
+				</li>
+				<li>
+					<button type="button" data-action="confirm-group">Save</button>
+				</li>
+			</menu>
+		</form></dialog><script>
+const dialog=document.querySelector('dialog');
+const menu=dialog.querySelector('.notate-group-menu');
+const picker=dialog.querySelector('[data-action="choose-group"]');
+picker.textContent='+';
+let selected='';
+function render(){menu.replaceChildren();picker.hidden=Boolean(selected);dialog.dataset.color=selected||'neutral';menu.classList.toggle('has-selection',Boolean(selected));for(const [name,color] of [['Design','yellow'],['Copy','mint'],['Research','sky']]){if(selected&&selected!==color)continue;const b=document.createElement('button');b.type='button';b.dataset.groupChoice=name;b.dataset.color=color;b.setAttribute('aria-pressed',String(selected===color));b.textContent=name;b.onclick=()=>{selected=color;render()};menu.append(b)}if(selected){const x=document.createElement('button');x.type='button';x.className='notate-folder-remove';x.textContent='×';x.setAttribute('aria-label','Remove from folder');x.onclick=()=>{selected='';render()};menu.append(x)}}
+render();document.querySelector('#open-note').onclick=()=>dialog.showModal();
+document.querySelector('.notate-note > p').onclick=()=>dialog.showModal();
+</script></html>

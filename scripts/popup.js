@@ -5,7 +5,7 @@ let annotateButton = document.querySelector('[data-action="start-annotating"]')
 
 window.addEventListener('unhandledrejection', (event) => {
 	const message = String(event.reason?.message || event.reason || '')
-	if (!message.includes("reading 'local'")) return
+	if (!event.reason?.code?.startsWith('NOTATE_STORAGE') && !message.includes("reading 'local'")) return
 
 	event.preventDefault()
 	renderStatusMessage('Notate could not reach Chrome storage. Reload unpacked from a local folder (not iCloud), then use the toolbar icon.')
@@ -34,22 +34,18 @@ const isRestrictedTab = (tab) => {
 	return !/^https?:/.test(url)
 }
 
-let bannerIsError = false
-
-const renderStatusMessage = (text) => {
-	const banner = document.querySelector('#popup-banner')
-	bannerIsError = true
-	if (banner) {
-		banner.hidden = false
-		banner.textContent = text
-		return
+const renderStatusMessage = text => {
+	let notice = document.querySelector('#notate-storage-status')
+	if (!notice) {
+		notice = document.createElement('p')
+		notice.id = 'notate-storage-status'
+		notice.setAttribute('role', 'alert')
+		document.querySelector('.popup-header')?.after(notice)
 	}
-
-	if (!list) return
-
-	list.innerHTML = `
-		<li class="popup-empty-state">${text}</li>
-	`
+	const activeDialog = document.querySelector('#group-edit-dialog[open]')
+	if (activeDialog) activeDialog.append(notice)
+	else document.querySelector('.popup-header')?.after(notice)
+	notice.textContent = text
 }
 
 const syncAddNoteAction = async () => {
@@ -57,20 +53,10 @@ const syncAddNoteAction = async () => {
 	const pageOk = Boolean(tab?.id) && !isRestrictedTab(tab)
 
 	if (annotateButton) {
-		annotateButton.hidden = !pageOk
+		annotateButton.hidden = false
+		annotateButton.title = pageOk ? 'Add a note to this page' : 'Open a regular website to add a note'
 	}
 
-	const banner = document.querySelector('#popup-banner')
-	if (!banner || bannerIsError) return
-
-	if (!pageOk) {
-		banner.hidden = false
-		banner.textContent = 'Open a website to add a note. New Tab and chrome:// pages cannot be marked.'
-		return
-	}
-
-	banner.hidden = true
-	banner.textContent = ''
 }
 
 const escapeHtml = (value = '') => notateEscapeHtml(value)
@@ -82,7 +68,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/confirm-dialog.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -143,9 +129,9 @@ const sendActionToActiveTab = async (action) => {
 	const scriptState = await ensureWebpageScript(tab.id)
 
 	if (scriptState === 'missing') {
-		// last resort: reload so the content script can install on a normal page load
-		await chrome.tabs.reload(tab.id)
-		return { ok: true, reason: 'reloaded' }
+		// Never refresh a user's website automatically: it may contain unsaved work.
+		await extensionStorageRemove(['notate-pending-url', 'notate-pending-selector', 'notate-pending-at', 'notate-pending-mode', 'notate-pending-group'])
+		return { ok: false, reason: 'connection-failed' }
 	}
 
 	try {
@@ -171,14 +157,15 @@ const sendActionToActiveTab = async (action) => {
 // Array.sort: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
 const getSortedPages = (storedAnnotations) => {
 	return Object.values(storedAnnotations).sort((pageA, pageB) => {
-		return (pageB.updatedAt || 0) - (pageA.updatedAt || 0)
+		const latest = page => Math.max(0, ...(page.annotations || []).map(note => note.createdAt || page.updatedAt || 0))
+		return latest(pageB) - latest(pageA)
 	})
 }
 
 // single vs plural annotation labeling
 // conditional operator: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Conditional_operator
 // const getAnnotationLabel = (count) => {
-// 	return count === 1 ? 'notation' : 'notations'
+// 	return count === 1 ? 'note' : 'notes'
 // }
 
 // turn one saved page object into one list item in the popup
@@ -201,7 +188,7 @@ const createAnnotationButton = (page, annotation, showPage = false, color = anno
 
 	return `
 		<li>
-			<button class="popup-annotation-item" type="button" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" data-color="${escapeHtml(notateNormalizeColor(color))}" title="${escapeHtml(page.title || page.url)}">${label}</button>
+			<button class="popup-annotation-item" type="button" data-note-id="${escapeHtml(annotation.id || '')}" data-url="${escapeHtml(page.url)}" data-selector="${escapeHtml(annotation.selector)}" ${annotation.group ? `data-color="${escapeHtml(notateNormalizeColor(color))}"` : ''} title="${escapeHtml(page.title || page.url)}"><span class="popup-annotation-text">${label}</span></button>
 		</li>
 	`
 }
@@ -209,24 +196,12 @@ const createAnnotationButton = (page, annotation, showPage = false, color = anno
 const createPageItem = (page) => {
 	const notes = page.annotations || []
 	const count = notes.length
-	const origin = new URL(page.url).origin
-	const favicon = `https://www.google.com/s2/favicons?domain=${origin}&sz=32`
-	const annotations = [...notes].map(notateNormalizeAnnotation).reverse()
-	const grouped = notateGroupedAnnotations(annotations)
-	const showGroupHeadings = grouped.some(([name]) => name !== NOTATE_UNGROUPED)
-	const annotationItems = grouped.map(([name, items]) => {
-		const buttons = items.map((annotation) => createAnnotationButton(page, annotation)).join('')
-		if (!showGroupHeadings) return buttons
+	const favicon = chrome.runtime.getURL('images/page.svg')
+	const annotations = [...notes].map(notateNormalizeAnnotation)
+		.reverse()
+		.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+	const annotationItems = annotations.map(annotation => createAnnotationButton(page, annotation)).join('')
 
-		return `
-			<li>
-				<h3>${escapeHtml(name)}</h3>
-				<ul>
-					${buttons}
-				</ul>
-			</li>
-		`
-	}).join('')
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join
 
 	return `
@@ -364,11 +339,13 @@ const openGroupEditor = async (name, focusColor = false) => {
 	const colors = await getGroupColors()
 	const color = notateResolveGroupColor(name, colors)
 	input.value = name
+	dialog.querySelector('#folder-dialog-title').textContent = name ? 'Edit folder' : 'New folder'
 	form.querySelectorAll('[name="group-color"]').forEach((radio) => {
 		radio.checked = radio.value === color
 	})
 	hideGroupTabMenu()
 	dialog.returnValue = 'cancel'
+	document.querySelector('#notate-storage-status')?.remove()
 	dialog.showModal()
 	if (focusColor) {
 		form.querySelector('[name="group-color"]:checked')?.focus()
@@ -377,62 +354,52 @@ const openGroupEditor = async (name, focusColor = false) => {
 		input.select()
 	}
 
-	const onClose = async () => {
-		dialog.removeEventListener('close', onClose)
-		if (dialog.returnValue !== 'save') return
-
-		const nextName = notateNormalizeGroup(form.querySelector('[name="group-name"]')?.value ?? '')
-		const nextColor = notateNormalizeColor(
-			form.querySelector('[name="group-color"]:checked')?.value || color
-		)
-		await saveGroupEdits(name, nextName, nextColor)
+	let pending = false
+	const onSubmit = async event => {
+		if (event.submitter?.value !== 'save') return
+		event.preventDefault()
+		if (pending) return
+		const nextName = notateNormalizeGroup(input.value)
+		const nextColor = notateNormalizeColor(form.querySelector('[name="group-color"]:checked')?.value || color)
+		pending = true
+		const buttons = [...form.querySelectorAll('button')]
+		buttons.forEach(button => { button.disabled = true })
+		const ok = name ? await saveGroupEdits(name, nextName, nextColor) : await createFolder(nextName, nextColor)
+		pending = false
+		buttons.forEach(button => { button.disabled = false })
+		if (ok) dialog.close('save')
 	}
-
-	dialog.addEventListener('close', onClose)
+	const onCancel = event => { if (pending) event.preventDefault() }
+	form.addEventListener('submit', onSubmit)
+	dialog.addEventListener('cancel', onCancel)
+	dialog.addEventListener('close', () => {
+		form.removeEventListener('submit', onSubmit)
+		dialog.removeEventListener('cancel', onCancel)
+	}, { once: true })
 }
 
+const createFolder = async (name, color) => {
+	try {
+		await notateMutate({ type: 'folder-create', name: notateNormalizeGroup(name), color })
+		await setLibraryGroup(name)
+		await renderAnnotatedPages()
+		return true
+	} catch (error) { renderStatusMessage(error.message); return false }
+}
 const saveGroupEdits = async (from, to, color) => {
-	const stored = await getStoredAnnotations()
-	const colors = await getGroupColors()
-	const order = await getGroupOrder()
-	const renamed = notateRenameGroup(stored, colors, order, from, to || from)
-	if (renamed.error === 'taken') {
-		renderStatusMessage('That group name is already used.')
-		return
-	}
-	if (renamed.error === 'empty' || renamed.error === 'missing') return
-
-	const painted = notateApplyGroupColor(renamed.stored, renamed.colors, renamed.selected, color)
-	await extensionStorageSet({
-		[storageKey]: painted.stored,
-		[groupColorsKey]: painted.colors,
-		[groupOrderKey]: renamed.order
-	})
-
-	const selected = await getLibraryGroup()
-	if (selected === from) await setLibraryGroup(renamed.selected)
-	renderAnnotatedPages()
+	try {
+		await notateMutate({ type: 'folder-edit', from, to: to || from, color })
+		await renderAnnotatedPages()
+		return true
+	} catch (error) { renderStatusMessage(error.message); return false }
 }
-
 const deleteNamedGroup = async (name) => {
-	const key = notateNormalizeGroup(name)
-	if (!key) return
-	if (!window.confirm(`Delete “${key}”? Notes stay in All, ungrouped.`)) return
-
-	const stored = await getStoredAnnotations()
-	const colors = await getGroupColors()
-	const order = await getGroupOrder()
-	const next = notateDeleteGroup(stored, colors, order, key)
-	await extensionStorageSet({
-		[storageKey]: next.stored,
-		[groupColorsKey]: next.colors,
-		[groupOrderKey]: next.order
-	})
-
-	const selected = await getLibraryGroup()
-	if (selected === key) await setLibraryGroup('')
-	hideGroupTabMenu()
-	renderAnnotatedPages()
+	if (!await notateConfirm({ followSystemTheme: true, title: `Delete folder “${name}”?`, message: 'Your notes are kept in All.', confirmLabel: 'Delete' })) return
+	try {
+		await notateMutate({ type: 'folder-delete', name })
+		hideGroupTabMenu()
+		await renderAnnotatedPages()
+	} catch (error) { renderStatusMessage(error.message) }
 }
 
 const bindGroupTabMenu = () => {
@@ -445,12 +412,8 @@ const bindGroupTabMenu = () => {
 		const name = menu.dataset.group || ''
 		if (!button || !name) return
 
-		if (button.dataset.action === 'rename-group') {
+		if (button.dataset.action === 'edit-group') {
 			await openGroupEditor(name, false)
-			return
-		}
-		if (button.dataset.action === 'recolor-group') {
-			await openGroupEditor(name, true)
 			return
 		}
 		if (button.dataset.action === 'delete-group') {
@@ -613,9 +576,8 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 	const menu = document.querySelector('#group-tabs')
 	if (!nav || !menu) return
 
-	const named = grouped
-		.map(([name]) => name)
-		.filter((name) => name && name !== NOTATE_UNGROUPED)
+	const named = [...new Set([...grouped.map(([name]) => name), ...Object.keys(colors)])]
+		.filter(name => name && name !== NOTATE_UNGROUPED)
 	const ordered = notateOrderGroupNames(named, order)
 	const tabs = [['', 'All'], ...ordered.map((name) => [name, name])]
 	const scroll = nav.scrollLeft
@@ -658,18 +620,17 @@ const renderGroupTabs = (grouped, selected, colors, order = []) => {
 		})
 	})
 
-	bindGroupTabDrag(menu, ordered)
+	// Folder order is chronological, not manually draggable.
 	bindGroupTabMenu()
 }
 
 // fallback state if nothing has been saved yet
 // Element.innerHTML: https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
 const renderEmptyState = () => {
-	hideGroupTabs()
+	renderGroupTabs([], '', {}, [])
 	list.innerHTML = `
 		<li class="popup-empty-state">
-			<h2>No notes yet</h2>
-			<p>Click New, then mark anything on the page.</p>
+			<p>No saved notes yet</p>
 		</li>
 	`
 }
@@ -678,9 +639,12 @@ const renderEmptyState = () => {
 // Array.find: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
 // chrome.tabs.query: https://developer.chrome.com/docs/extensions/reference/api/tabs#method-query
 const findMatchingTab = async (url) => {
+	const currentTabs = await chrome.tabs.query({ currentWindow: true })
+	const matches = tab => pageUrlsMatch(tab.url, url)
+	const localMatch = currentTabs.find(tab => tab.active && matches(tab)) || currentTabs.find(matches)
+	if (localMatch) return localMatch
 	const tabs = await chrome.tabs.query({})
-
-	return tabs.find((tab) => pageUrlsMatch(tab.url, url))
+	return tabs.find(matches)
 }
 
 // write the url I want to annotate into storage so webpage.js can read it after the page loads
@@ -698,8 +662,10 @@ const setPendingAnnotationUrl = async (url, mode = 'preview') => {
 // await the background message before closing the popup or Chrome drops it
 // if it's not open, create a new tab and let pending storage / tabs.onUpdated finish the rest
 // selector gets saved to storage so webpage.js can scroll to that specific annotation
-const activateOrOpenPage = async (url, selector = null) => {
-	if (!url) return
+const activateOrOpenPage = async (url, selector = null, annotationId = null) => {
+	try { if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error() }
+	catch { renderStatusMessage('This saved address cannot be opened safely. Your saved note has been kept.'); return }
+	await extensionStorageSet({ 'notate-pending-note-id': annotationId })
 
 	if (selector) {
 		await extensionStorageSet({ 'notate-pending-selector': selector })
@@ -723,6 +689,7 @@ const activateOrOpenPage = async (url, selector = null) => {
 				tabId: matchingTab.id,
 				windowId: matchingTab.windowId,
 				selector,
+				annotationId,
 				url,
 				mode: 'preview'
 			})
@@ -731,7 +698,7 @@ const activateOrOpenPage = async (url, selector = null) => {
 			try {
 				await chrome.tabs.sendMessage(matchingTab.id, {
 					action: selector ? 'enter-preview-mode-scroll' : 'enter-preview-mode',
-					selector
+					selector, annotationId
 				})
 			} catch {
 			}
@@ -744,6 +711,35 @@ const activateOrOpenPage = async (url, selector = null) => {
 // link each annotated page button
 // Element.querySelectorAll: https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll
 // page button navigates to the page, arrow toggles the dropdown, annotation items jump to that specific one
+const bindAnnotationContextMenu = () => {
+	const menu = document.querySelector('#annotation-context-menu')
+	const hide = () => { menu.hidden = true }
+	list.addEventListener('contextmenu', event => {
+		const note = event.target.closest('.popup-annotation-item')
+		if (!note) return
+		event.preventDefault()
+		hideGroupTabMenu()
+		menu.dataset.noteId = note.dataset.noteId
+		menu.dataset.url = note.dataset.url
+		menu.hidden = false
+		menu.style.left = `${Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8))}px`
+		menu.style.top = `${Math.max(8, Math.min(event.clientY, innerHeight - menu.offsetHeight - 8))}px`
+		menu.querySelector('button').focus()
+	})
+	menu.querySelector('button').addEventListener('click', async () => {
+		const id = menu.dataset.noteId
+		const url = menu.dataset.url
+		hide()
+		if (!id || !await notateConfirm({ followSystemTheme: true, title: 'Delete this note?', message: 'This cannot be undone.', confirmLabel: 'Delete' })) return
+		try {
+			await notateMutate({ type: 'delete', url, id })
+			await renderAnnotatedPages()
+		} catch (error) { renderStatusMessage(error.message) }
+	})
+	document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) hide() })
+	document.addEventListener('keydown', event => { if (event.key === 'Escape') hide() })
+}
+
 const bindPageButtons = () => {
 	list.querySelectorAll('.popup-page-button').forEach((button) => {
 		button.addEventListener('click', async () => {
@@ -760,15 +756,51 @@ const bindPageButtons = () => {
 	list.querySelectorAll('.popup-page-toggle').forEach((toggle) => {
 		const dropdown = toggle.closest('.popup-page-item').querySelector('.popup-annotation-list')
 
+		let expanded = !dropdown.hidden
+		let animation = null
+		toggle.setAttribute('aria-expanded', String(expanded))
 		toggle.addEventListener('click', () => {
-			dropdown.hidden = !dropdown.hidden
-			toggle.classList.toggle('is-open', !dropdown.hidden)
+			const fromHeight = dropdown.getBoundingClientRect().height
+			animation?.cancel()
+			expanded = !expanded
+			dropdown.hidden = false
+			const toHeight = expanded ? dropdown.scrollHeight : 0
+			// Use travel distance so longer lists and interrupted reversals scale naturally.
+			const noteCount = dropdown.querySelectorAll('.popup-annotation-item').length
+			const duration = noteCount <= 3
+				? Math.max(420, Math.abs(toHeight - fromHeight) * 6)
+				: Math.max(220, Math.abs(toHeight - fromHeight) * 4)
+			toggle.style.setProperty('--dropdown-duration', `${duration}ms`)
+			toggle.classList.toggle('is-open', expanded)
+			toggle.setAttribute('aria-expanded', String(expanded))
+			dropdown.inert = !expanded
+			dropdown.hidden = false
+
+			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+				dropdown.hidden = !expanded
+				dropdown.style.overflow = ''
+				return
+			}
+
+			dropdown.style.overflow = 'hidden'
+			animation = dropdown.animate([
+				{ height: `${fromHeight}px` },
+				{ height: `${toHeight}px` }
+			], { duration, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' })
+			const currentAnimation = animation
+			animation.onfinish = () => {
+				if (animation !== currentAnimation) return
+				dropdown.hidden = !expanded
+				currentAnimation.cancel()
+				dropdown.style.overflow = ''
+				animation = null
+			}
 		})
 	})
 
 	list.querySelectorAll('.popup-annotation-item').forEach((button) => {
 		button.addEventListener('click', async () => {
-			await activateOrOpenPage(button.dataset.url, button.dataset.selector)
+			await activateOrOpenPage(button.dataset.url, button.dataset.selector, button.dataset.noteId)
 		})
 	})
 }
@@ -787,6 +819,7 @@ const renderAnnotatedPages = async () => {
 			.filter((name) => name !== NOTATE_UNGROUPED)
 	)
 	const colors = notateResolveGroupColors(grouped, await getGroupColors())
+	Object.keys(colors).forEach(name => groupNames.add(name))
 	let selected = await getLibraryGroup()
 
 	if (selected && !groupNames.has(selected)) {
@@ -794,31 +827,23 @@ const renderAnnotatedPages = async () => {
 		await setLibraryGroup('')
 	}
 
-	if (!pages.length) {
+	if (!pages.length && !Object.keys(colors).length) {
 		renderEmptyState()
 		return
 	}
 
-	renderGroupTabs(grouped, selected, colors, await getGroupOrder())
+	const folderDates = await extensionStorageGet(NOTATE_FOLDER_CREATED_KEY)
+	renderGroupTabs(grouped, selected, colors, notateFoldersNewestFirst(storedAnnotations, colors, folderDates[NOTATE_FOLDER_CREATED_KEY] || {}))
 
-	const visible = selected
-		? notes.filter((note) => notateGroupKey(note.group) === selected)
-		: notes
+	const visiblePages = pages.map(page => ({
+		...page,
+		annotations: (page.annotations || [])
+			.filter(note => !selected || notateNormalizeGroup(note.group) === selected)
+			.map(note => ({ ...note, color: notateResolveGroupColor(note.group, colors, note.color) }))
+	})).filter(page => page.annotations.length)
 
-	if (!visible.length) {
-		list.innerHTML = `
-			<li class="popup-empty-state">
-				<h2>No notes in this group</h2>
-				<p>Switch tabs, or add a note to this group.</p>
-			</li>
-		`
-		return
-	}
+	list.innerHTML = visiblePages.length ? visiblePages.map(createPageItem).join('') : (selected ? '<li class="popup-empty-state"><p>No matching notes.</p></li>' : '<li class="popup-empty-state"><p>No saved notes yet</p></li>')
 
-	list.innerHTML = visible.map((item) => {
-		const color = notateResolveGroupColor(item.group, colors, item.color)
-		return createAnnotationButton(item.page, item, true, color)
-	}).join('')
 	bindPageButtons()
 }
 
@@ -837,106 +862,76 @@ const onStartAnnotatingClick = async () => {
 	}
 }
 
-const exportAllAnnotations = async () => {
-	const storedAnnotations = await getStoredAnnotations()
-	const pages = getSortedPages(storedAnnotations)
-
-	if (!pages.length) {
-		renderStatusMessage('Nothing to export yet. Add a note first.')
-		return
-	}
-
-	const stamp = new Date().toISOString().slice(0, 10)
-	notateDownloadJson(notateExportPayload(storedAnnotations), `notate-${stamp}.json`)
-}
-
 // clear all annotations across every saved page at once so wipes the entire storage key
 // chrome.storage.local.remove: https://developer.chrome.com/docs/extensions/reference/api/storage/StorageArea#method-StorageArea-remove
 const clearAllAnnotations = async () => {
-	if (!window.confirm('Clear every note? This cannot be undone.')) return
+	if (!await notateConfirm({ followSystemTheme: true, title: 'Clear all notes?', message: 'This deletes notes across every saved page. Folders are kept. This cannot be undone.' })) return
 
-	await extensionStorageRemove(storageKey)
+	try { await notateMutate({ type: 'clear-all' }) }
+	catch (error) { renderStatusMessage(error.message); return }
 	renderAnnotatedPages()
 }
 
-const onboardKey = 'notate-onboarded'
-const gsStepCount = 4
-let gsStep = 0
+// Versioned instructions: show once again after this UI update, then remember dismissal.
+const onboardKey = 'notate-onboarded-2026-09-17-paper-curl-preview'
 
 const showOnboard = (visible) => {
-	const onboard = document.querySelector('#getting-started')
+	const onboard = document.querySelector('.popup-onboard')
 	if (!onboard) return
 	onboard.hidden = !visible
-	document.body.classList.toggle('is-getting-started', visible)
-	if (visible) setGettingStartedStep(gsStep)
 }
 
-const setGettingStartedStep = (step) => {
-	gsStep = Math.max(0, Math.min(gsStepCount - 1, Number(step) || 0))
-
-	document.querySelectorAll('.gs-step').forEach((btn) => {
-		const index = Number(btn.dataset.gsStep)
-		const isActive = index === gsStep
-		const isDone = index < gsStep
-		btn.classList.toggle('is-active', isActive)
-		btn.classList.toggle('is-done', isDone)
-		if (isActive) btn.setAttribute('aria-current', 'step')
-		else btn.removeAttribute('aria-current')
-	})
-
-	document.querySelectorAll('.gs-panel').forEach((panel) => {
-		const index = Number(panel.dataset.gsPanel)
-		const active = index === gsStep
-		panel.hidden = !active
-		panel.classList.toggle('is-active', active)
-	})
-}
-
+let onboardingClosing = false
 const dismissOnboard = async () => {
+	const onboard = document.querySelector('.popup-onboard')
+	if (!onboard || onboard.hidden || onboardingClosing) return
+	onboardingClosing = true
+	const closeButton = onboard.querySelector('[data-action="dismiss-onboard"]')
+	const restoreFocus = onboard.contains(document.activeElement)
+	if (closeButton) closeButton.disabled = true
+	const main = onboard.nextElementSibling
+	const cardHeight = onboard.getBoundingClientRect().height
+	const cardStyle = getComputedStyle(onboard)
+	const topGap = parseFloat(cardStyle.marginTop) || 0
+	main?.style.setProperty('--onboard-cover-height', `${cardHeight + topGap}px`)
+	const saveDismissal = extensionStorageSet({ [onboardKey]: true })
+	let animation
 	try {
-		await extensionStorageSet({ [onboardKey]: true })
-	} catch {
-		// still close the panel when storage is unavailable (preview / load errors)
+		if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			// Collapse the space below the stationary aside so the opaque library
+			// slides over it, rather than squeezing or fading the instructions.
+			animation = onboard.animate([
+				{ marginBottom: getComputedStyle(onboard).marginBottom },
+				{ marginBottom: `-${cardHeight + topGap}px` }
+			], { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' })
+			await animation.finished
+		}
+	} finally {
+		showOnboard(false)
+		animation?.cancel()
+		main?.style.removeProperty('--onboard-cover-height')
+		onboardingClosing = false
+		if (closeButton) closeButton.disabled = false
+		if (restoreFocus) {
+			const nextControl = document.querySelector('#group-tabs button') ||
+				document.querySelector('[data-action="clear-all"]')
+			nextControl?.focus()
+		}
 	}
-	showOnboard(false)
-}
-
-const finishOnboardAndAnnotate = async () => {
-	await dismissOnboard()
-	if (typeof onStartAnnotatingClick === 'function') {
-		await onStartAnnotatingClick()
-	}
+	await saveDismissal
 }
 
 const initOnboard = async () => {
-	const forcePreview = /(?:\?|&)onboard=1(?:&|$)/.test(location.search) || location.hash === '#onboard'
-	if (forcePreview) {
-		showOnboard(true)
-		return
-	}
-
 	const stored = await extensionStorageGet(onboardKey)
 	showOnboard(!stored[onboardKey])
-}
-
-const bindGettingStarted = () => {
-	document.querySelectorAll('[data-gs-step]').forEach((btn) => {
-		btn.addEventListener('click', () => setGettingStartedStep(btn.dataset.gsStep))
-	})
-
-	document.querySelectorAll('[data-action="gs-next"]').forEach((btn) => {
-		btn.addEventListener('click', () => setGettingStartedStep(gsStep + 1))
-	})
-
-	document.querySelector('[data-action="gs-finish"]')?.addEventListener('click', finishOnboardAndAnnotate)
-	document.querySelectorAll('[data-action="dismiss-onboard"]').forEach((btn) => {
-		btn.addEventListener('click', dismissOnboard)
-	})
 }
 
 // initial popup load
 const initPopup = () => {
 	setHeaderIcon()
+	bindGroupTabMenu()
+	bindAnnotationContextMenu()
+
 
 	if (!getExtensionStorage()) {
 		renderStatusMessage('Notate has to run as a loaded Chrome extension, not as a webpage. Load unpacked from a local folder (not iCloud), then use the toolbar icon.')
@@ -948,8 +943,7 @@ const initPopup = () => {
 	annotateButton?.addEventListener('click', onStartAnnotatingClick)
 
 	document.querySelector('[data-action="clear-all"]')?.addEventListener('click', clearAllAnnotations)
-	document.querySelector('[data-action="export"]')?.addEventListener('click', exportAllAnnotations)
-	bindGettingStarted()
+	document.querySelector('[data-action="dismiss-onboard"]')?.addEventListener('click', dismissOnboard)
 	document.querySelector('[data-action="view-groups"]')?.addEventListener('click', async () => {
 		await setLibraryView('groups')
 		renderAnnotatedPages()

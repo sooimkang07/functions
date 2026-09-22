@@ -1,0 +1,5 @@
+
+# Generated review packages
+release/
+recovery/
+.DS_Store

@@ -1,0 +1,49 @@
+<!doctype html>
+<html class="is-annotating is-previewing"><meta charset="utf-8">
+<title>Notate CSS isolation check</title>
+<style>
+* { cursor:none !important; }
+html { font-size:10px; --color-primary:magenta; --note-bg:lime; --duration-md:7s; }
+body { font:16px system-ui; margin:24px; background:#fafafa; color:#222; }
+#host { font-size:2rem; transition:opacity 3s; animation:host-pulse 9s linear infinite; }
+@keyframes host-pulse { from { opacity:.99 } to { opacity:1 } }
+#results { white-space:pre-wrap; padding:16px; border:1px solid #bbb; }
+</style>
+<h1>Notate CSS isolation regression</h1>
+<div id="host" data-color="sky"><button data-action="clear">Website Clear button</button><button data-action="preview">Website Preview button</button></div>
+<pre id="results">Checking…</pre>
+<aside id="notate-toolbar"><menu class="notate-toolbar-group"><li><button class="notate-toolbar-button" data-action="edit">New</button></li></menu></aside>
+<div id="notate-layer"><aside class="notate-note" data-color="sky" style="top:280px;left:24px"><p>Notate note</p><button class="notate-delete"><svg width="12" height="12"><path d="M0 0L12 12"/></svg></button></aside></div>
+<dialog id="notate-modal"><textarea></textarea><button><span>Save</span></button></dialog>
+<script>
+const snapshot = () => {
+ const root=getComputedStyle(document.documentElement), host=getComputedStyle(document.querySelector('#host'))
+ return JSON.stringify({root:root.fontSize,primary:root.getPropertyValue('--color-primary'),note:host.getPropertyValue('--note-bg'),font:host.fontSize,transition:host.transitionDuration,animation:host.animationDuration,buttons:[...document.querySelectorAll('#host button')].map(b=>getComputedStyle(b).display)})
+}
+const before=snapshot()
+const link=document.createElement('link');link.rel='stylesheet';link.href='../styles/webpage.css'
+link.onload=()=>setTimeout(()=>{
+ const lines=[], check=(label,ok)=>lines.push((ok?'PASS':'FAIL')+' '+label)
+ check('Website typography, tokens, action buttons and motion unchanged', before===snapshot())
+ check('Toolbar font stays 12px with website root at 10px', getComputedStyle(document.querySelector('#notate-toolbar button')).fontSize==='12px')
+ check('Folder color applies within Notate',getComputedStyle(document.querySelector('.notate-note'), '::before').backgroundColor==='rgb(191, 222, 241)')
+ document.documentElement.classList.add('notate-is-annotating')
+ check('Annotation mode leaves website action buttons visible',[...document.querySelectorAll('#host button')].every(b=>getComputedStyle(b).display!=='none'))
+ document.documentElement.style.fontSize='24px'
+ check('Website may change its root font',getComputedStyle(document.documentElement).fontSize==='24px')
+ check('Notate remains same size after website font changes',getComputedStyle(document.querySelector('#notate-toolbar button')).fontSize==='12px')
+ const cursor = selector => getComputedStyle(document.querySelector(selector)).cursor
+ check('Host cursor remains hidden for its custom effect', cursor('#host') === 'none' && cursor('#host button') === 'none')
+ check('Saved note and text restore native pointer', cursor('.notate-note') === 'pointer' && cursor('.notate-note p') === 'pointer')
+ check('Nested delete icon retains pointer', cursor('.notate-delete svg path') === 'pointer')
+ check('Toolbar button restores pointer', cursor('#notate-toolbar button') === 'pointer')
+ check('Composer restores text cursor and button pointer', cursor('#notate-modal textarea') === 'text' && cursor('#notate-modal button span') === 'pointer')
+ document.documentElement.classList.remove('notate-is-annotating')
+ document.documentElement.classList.add('notate-is-moving')
+ check('Move mode restores grab over note text', cursor('.notate-note p') === 'grab')
+ document.querySelector('#results').textContent=lines.join('\n')
+ document.title=lines.some(x=>x.startsWith('FAIL'))?'FAIL — Notate isolation':'PASS — Notate isolation'
+}, 150)
+link.onerror=()=>document.querySelector('#results').textContent='FAIL stylesheet unavailable'
+document.head.append(link)
+</script></html>

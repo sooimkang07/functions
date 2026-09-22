@@ -1,12 +1,10 @@
 {
 	"manifest_version": 3,
 	"name": "Notate",
-	"description": "Annotate specific elements on live pages. Keep what caught your attention, why it mattered, and the original context so you can return later.",
-	"version": "1.18",
+	"description": "Annotate live webpages, organize notations into folders, and return to your ideas in context.",
+	"version": "1.14",
 	"permissions": [
-		"activeTab",
 		"tabs",
-		"windows",
 		"storage",
 		"scripting",
 		"sidePanel"
@@ -40,6 +38,7 @@
 				"scripts/url-match.js",
 				"scripts/safe-storage.js",
 				"scripts/note-meta.js",
+				"scripts/confirm-dialog.js",
 				"scripts/webpage.js"
 			],
 			"css": [

@@ -1,15 +1,15 @@
 (() => {
 	if (globalThis.pageUrlsMatch) return
 
-	// ignore hash and a trailing slash so saved notes still match after redirects
+	// Ignore section anchors, but preserve conventional SPA hash routes.
 	globalThis.normalizePageUrl = (url = '') => {
 		try {
 			const parsed = new URL(url)
-			parsed.hash = ''
+			const routeHash = /^#(?:\/|!\/)/.test(parsed.hash) ? parsed.hash : ''
 			if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
 				parsed.pathname = parsed.pathname.slice(0, -1)
 			}
-			return `${parsed.origin}${parsed.pathname}${parsed.search}`
+			return `${parsed.origin}${parsed.pathname}${parsed.search}${routeHash}`
 		} catch {
 			return url
 		}

@@ -1,4 +1,4 @@
-importScripts('url-match.js', 'safe-storage.js', 'icons.js')
+importScripts('url-match.js', 'safe-storage.js', 'icons.js', 'note-meta.js', 'storage-writer.js')
 
 // had to add this back in because chrome won't let the popup switch tabs/windows while it's still open
 // tried doing it directly in popup.js but the focus call didn't do anything
@@ -13,7 +13,7 @@ const pingTab = async (tabId) => {
 const injectWebpageScript = async (tabId) => {
 	await chrome.scripting.executeScript({
 		target: { tabId },
-		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/webpage.js']
+		files: ['scripts/url-match.js', 'scripts/safe-storage.js', 'scripts/note-meta.js', 'scripts/confirm-dialog.js', 'scripts/webpage.js']
 	})
 	await chrome.scripting.insertCSS({
 		target: { tabId },
@@ -45,7 +45,7 @@ const isFreshPending = (stored = {}) => {
 const clearPending = async () => {
 	await extensionStorageRemove([
 		'notate-pending-url',
-		'notate-pending-selector',
+		'notate-pending-selector', 'notate-pending-note-id',
 		'notate-pending-at',
 		'notate-pending-mode'
 	])
@@ -59,13 +59,14 @@ const messageForMode = (mode, selector) => {
 	return selector ? 'enter-preview-mode-scroll' : 'enter-preview-mode'
 }
 
-const enterOnTab = async (tabId, selector, mode = 'preview') => {
+const enterOnTab = async (tabId, selector, mode = 'preview', annotationId = null) => {
 	const ready = await ensureWebpageScript(tabId)
 	if (!ready) return false
 
 	await chrome.tabs.sendMessage(tabId, {
 		action: messageForMode(mode, selector),
-		selector: selector || null
+		selector: selector || null,
+		annotationId
 	})
 	return true
 }
@@ -75,7 +76,7 @@ const tryEnterPendingOnTab = async (tab) => {
 
 	const stored = await extensionStorageGet([
 		'notate-pending-url',
-		'notate-pending-selector',
+		'notate-pending-selector', 'notate-pending-note-id',
 		'notate-pending-at',
 		'notate-pending-mode'
 	])
@@ -87,7 +88,8 @@ const tryEnterPendingOnTab = async (tab) => {
 		const ok = await enterOnTab(
 			tab.id,
 			stored['notate-pending-selector'] || null,
-			stored['notate-pending-mode'] === 'annotate' ? 'annotate' : 'preview'
+			stored['notate-pending-mode'] === 'annotate' ? 'annotate' : 'preview',
+			stored['notate-pending-note-id'] || null
 		)
 		if (ok) await clearPending()
 	} catch {
@@ -98,10 +100,10 @@ const tryEnterPendingOnTab = async (tab) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	if (message.action !== 'activate-tab') return
 
-	const { tabId, windowId, selector, mode } = message
+	const { tabId, windowId, selector, mode, annotationId } = message
 
 	const activateTab = async () => {
-		const stored = await extensionStorageGet(['notate-pending-selector', 'notate-pending-mode'])
+		const stored = await extensionStorageGet(['notate-pending-selector', 'notate-pending-note-id', 'notate-pending-mode'])
 		const nextSelector = selector || stored['notate-pending-selector'] || null
 		const nextMode = mode || stored['notate-pending-mode'] || 'preview'
 
@@ -120,7 +122,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		await chrome.tabs.update(tabId, { active: true })
 
 		try {
-			const ok = await enterOnTab(tabId, nextSelector, nextMode)
+			const ok = await enterOnTab(tabId, nextSelector, nextMode, annotationId)
 			if (ok) await clearPending()
 		} catch {
 		}
@@ -175,7 +177,8 @@ const applyToolbarIcon = async () => {
 	}
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(details => {
+	if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }).catch(() => {})
 	chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 	applyToolbarIcon()
 })

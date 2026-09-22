@@ -2,6 +2,18 @@
 	if (globalThis.notateNormalizeAnnotation) return
 
 	globalThis.NOTATE_COLORS = ['yellow', 'mint', 'sky', 'peach', 'lilac', 'rose']
+	globalThis.NOTATE_FOLDER_CREATED_KEY = 'notate-folder-created-at'
+	globalThis.notateFoldersNewestFirst = (stored = {}, colors = {}, created = {}) => {
+		const times = new Map()
+		Object.values(stored).forEach(page => (page.annotations || []).forEach(note => {
+			const name = globalThis.notateNormalizeGroup(note.group)
+			const time = Number(note.createdAt) || Number(page.updatedAt) || 0
+			if (name && time > 0) times.set(name, Math.min(times.get(name) ?? Infinity, time))
+		}))
+		return globalThis.notateCollectGroupNames(stored, colors).sort((a, b) =>
+			(Number(created[b]) || times.get(b) || 0) - (Number(created[a]) || times.get(a) || 0) || a.localeCompare(b))
+	}
+
 	globalThis.NOTATE_COLOR_DEFAULT = 'yellow'
 	globalThis.NOTATE_UNGROUPED = 'Ungrouped'
 	globalThis.NOTATE_NEW_GROUP = '__new__'

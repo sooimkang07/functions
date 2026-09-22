@@ -1,0 +1,3 @@
+<!doctype html><meta charset="utf-8"><title>Notate release QA</title><style>body{font:18px system-ui;max-width:700px;margin:60px auto}section{padding:30px;border:1px solid #aaa;margin:24px 0}</style><h1>Notate release QA</h1><p>Synthetic content for annotation persistence tests.</p><section id="target-a">Target A — save a notation here.</section><section id="target-b">Target B — verify a second notation.</section><a href="?page=2">Go to page two</a> <a href="?page=1">Go to page one</a>
+
+<p><button onclick="history.pushState({}, '', '#/second');document.title='Notate QA route two'">Change SPA route</button> <button onclick="document.querySelector('#target-a')?.remove()">Remove target A</button></p>
