@@ -127,7 +127,6 @@ h1 { margin: 0; font-size: clamp(32px,5.6vw,64px); line-height: 1; }
 .gs-workflow-cards::-webkit-scrollbar { display: none; }
 .gs-workflow-cards.is-auto-sliding { scroll-snap-type: none; }
 .gs-workflow-card { display: flex; flex-direction: column; flex: 0 0 92%; scroll-snap-align: start; padding: 24px 28px; border-radius: 28px; }
-.gs-workflow-card:last-child { flex-basis: 100%; }
 .gs-workflow-card .gs-svg { order: 0; flex: none; filter: drop-shadow(0 4px 8px rgb(0 0 0 / 6%)); }
 .gs-workflow-card .gs-scene-label { font-size: 16px; font-weight: 500; fill: var(--notate-setup-ink); }
 .gs-workflow-intro { order: 1; padding: 0; margin: 0; text-align: center; }
