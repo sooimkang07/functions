@@ -182,13 +182,27 @@ const typingCard = typedNote.closest('.gs-workflow-card')
 const typingLines = [...typedNote.querySelectorAll('tspan')]
 const typingCopy = typingLines.map(line => line.textContent)
 const typingCaret = typingCard.querySelector('.gs-typing-caret')
-const savedHover = typingCard.querySelector('.gs-saved-note-hover')
+const typingOriginX = Number(typedNote.getAttribute('x')) || 29
+const typingOriginY = Number(typedNote.getAttribute('y')) || 252
+const typingLineGap = Number(typingLines[1]?.getAttribute('dy')) || 23
 let typingFrame = 0
+const placeTypingCaret = typedCount => {
+ let lineIdx = 0
+ let used = typedCount
+ for (; lineIdx < typingCopy.length; lineIdx++) {
+  if (used <= typingCopy[lineIdx].length) break
+  used -= typingCopy[lineIdx].length
+ }
+ if (lineIdx >= typingCopy.length) lineIdx = typingCopy.length - 1
+ const x = typingOriginX + typingLines[lineIdx].getComputedTextLength()
+ const y = typingOriginY + lineIdx * typingLineGap - 20
+ typingCaret.setAttribute('d', `M${x} ${y}v19`)
+}
 const restoreTyping = () => {
  cancelAnimationFrame(typingFrame)
  typingLines.forEach((line, i) => { line.textContent = typingCopy[i] })
+ placeTypingCaret(typingCopy.join('').length)
  typingCaret.style.opacity = '1'
- savedHover.style.opacity = '0'
 }
 const typingObserver = new IntersectionObserver(entries => {
  restoreTyping()
@@ -197,15 +211,19 @@ const typingObserver = new IntersectionObserver(entries => {
  const length = typingCopy.join('').length
  const type = now => {
   const elapsed = (now - started) % 6000
-  let count = Math.floor(Math.max(0, elapsed - 200) / 28)
+  const startAt = 200
+  const charMs = 28
+  let count = Math.min(length, Math.floor(Math.max(0, elapsed - startAt) / charMs))
+  let remaining = count
   typingLines.forEach((line, i) => {
-   line.textContent = typingCopy[i].slice(0, Math.max(0, count))
-   count -= typingCopy[i].length
+   const take = Math.max(0, Math.min(typingCopy[i].length, remaining))
+   line.textContent = typingCopy[i].slice(0, take)
+   remaining -= take
   })
-  const done = elapsed > 200 + length * 28
-  typingCaret.style.opacity = done ? '1' : '0'
-  const hoverProgress = (elapsed - (400 + length * 28)) / 250
-  savedHover.style.opacity = String(Math.max(0, Math.min(1, hoverProgress)))
+  placeTypingCaret(count)
+  const startedTyping = elapsed >= startAt
+  const blinkOn = Math.floor(elapsed / 530) % 2 === 0
+  typingCaret.style.opacity = startedTyping && blinkOn ? '1' : '0'
   typingFrame = requestAnimationFrame(type)
  }
  typingFrame = requestAnimationFrame(type)
