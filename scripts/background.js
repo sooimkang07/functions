@@ -177,10 +177,26 @@ const applyToolbarIcon = async () => {
 	}
 }
 
+// Temporary editing mode: open on Chrome startup and extension reload/update.
+// Set false when welcome-page editing is finished to restore install-only behavior.
+const WELCOME_EDITING_MODE = true
+const openWelcomePage = async () => {
+	const url = chrome.runtime.getURL('welcome.html')
+	const tabs = await chrome.tabs.query({ url })
+	if (tabs[0]?.id) {
+		await chrome.tabs.update(tabs[0].id, { url, active: true })
+	} else {
+		await chrome.tabs.create({ url })
+	}
+}
+
 chrome.runtime.onInstalled.addListener(details => {
-	if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }).catch(() => {})
+	if (WELCOME_EDITING_MODE || details.reason === 'install') openWelcomePage().catch(() => {})
 	chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 	applyToolbarIcon()
 })
-chrome.runtime.onStartup.addListener(applyToolbarIcon)
+chrome.runtime.onStartup.addListener(() => {
+	applyToolbarIcon()
+	if (WELCOME_EDITING_MODE) openWelcomePage().catch(() => {})
+})
 applyToolbarIcon()

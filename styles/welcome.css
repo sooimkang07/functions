@@ -13,7 +13,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; padding: 46px 48px 24px; background: #fff; color: var(--notate-setup-ink); font-family: var(--font-ui); }
-h1 { margin: 0 0 30px; font-size: clamp(36px, 3.75vw, 64px); font-weight: 600; letter-spacing: -.035em; line-height: 1.25; }
+h1 { margin: 0 0 30px; font-size: clamp(36px, 3.75vw, 64px); font-weight: 500; letter-spacing: -.035em; line-height: 1.25; }
 button { font-family: inherit; cursor: pointer; color: inherit; }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 [hidden] { display: none !important; }
@@ -80,7 +80,7 @@ h1 { margin: 0; font-size: clamp(32px,5.6vw,64px); line-height: 1; }
 .gs-stage { min-height: 0; padding: 20px 20px 32px; }
 .gs-panel { min-height: 0; gap: 12px; }
 .gs-graphic { width: min(100%, 720px); margin: 0; min-height: 0; }
-.gs-graphic .gs-svg { width: 100%; height: auto; }
+.gs-graphic .gs-svg { width: 100%; height: auto; filter: drop-shadow(0 4px 8px rgb(0 0 0 / 6%)); }
 .gs-copy h3 { font-size: 28px; line-height: 1.1; white-space: normal; }
 .gs-copy p { font-size: 16px; line-height: 1.5; white-space: normal; max-width: 640px; margin-inline: auto; }
 .gs-cta { margin-top: 24px; }
@@ -110,4 +110,141 @@ h1 { margin: 0; font-size: clamp(32px,5.6vw,64px); line-height: 1; }
 }
 @media (min-width:1280px) {
  .getting-started, .getting-started:has([data-gs-panel="3"]:not([hidden])) { grid-template-columns: minmax(260px,340px) minmax(0,1fr); gap: 32px; }
+}
+
+/* Mockup layout responds to the available stage width, including an open sidebar. */
+.gs-stage { container-type: inline-size; padding: 32px; overflow: hidden; }
+.gs-panel { gap: 28px; }
+.gs-copy { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.gs-copy h3 { margin: 0 0 20px; font-size: 28px; font-weight: 500; color: var(--notate-setup-ink); line-height: 1.15; text-wrap: balance; }
+.gs-copy p { margin: 0; font-size: 15px; font-weight: 400; color: var(--notate-setup-muted); line-height: 1.5; text-wrap: pretty; }
+.gs-copy .gs-cta { margin-top: 24px; min-height: 52px; width: max-content; flex-shrink: 0; padding: 0 20px; font-size: 16px; font-weight: 500; line-height: 20px; gap: 10px; white-space: nowrap; }
+.gs-cta svg { width: 20px; height: 20px; flex-shrink: 0; }
+.gs-graphic { width: 100%; flex: none; }
+.gs-graphic .gs-svg { width: 100%; height: auto; }
+.gs-carousel { width: 100%; min-width: 0; }
+.gs-workflow-cards { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; gap: 10px; margin: 0; }
+.gs-workflow-cards::-webkit-scrollbar { display: none; }
+.gs-workflow-cards.is-auto-sliding { scroll-snap-type: none; }
+.gs-workflow-card { display: flex; flex-direction: column; flex: 0 0 92%; scroll-snap-align: start; padding: 24px 28px; border-radius: 28px; }
+.gs-workflow-card:last-child { flex-basis: 100%; }
+.gs-workflow-card .gs-svg { order: 0; flex: none; filter: drop-shadow(0 4px 8px rgb(0 0 0 / 6%)); }
+.gs-workflow-card .gs-scene-label { font-size: 16px; font-weight: 500; fill: var(--notate-setup-ink); }
+.gs-workflow-intro { order: 1; padding: 0; margin: 0; text-align: center; }
+.gs-workflow-intro h4 { margin: 0 0 8px; font-size: clamp(20px, 2.6cqi, 28px); line-height: 1.15; }
+.gs-workflow-intro p { font-size: 14px; line-height: 1.5; }
+.gs-carousel-dots { display: flex; justify-content: center; gap: 4px; margin-top: 18px; }
+.gs-carousel-dots button { position: relative; border: 0; padding: 0; width: 10px; height: 10px; border-radius: 999px; background: #ccc; }
+.gs-carousel-dots button::before { content: ''; position: absolute; inset: -7px; }
+.gs-carousel-dots button[aria-pressed="true"] { width: 26px; background: #111; }
+@container (min-width: 700px) {
+ .gs-panel { display: grid; grid-template-columns: minmax(220px, 23%) minmax(0, 1fr); align-items: center; gap: 40px; min-height: 500px; }
+ .gs-copy { grid-column: 1; grid-row: 1; align-self: stretch; padding-block: 64px 0; }
+ .gs-copy .gs-cta { align-self: flex-start; }
+ .gs-graphic, .gs-carousel { grid-column: 2; grid-row: 1; }
+ .gs-graphic { max-width: none; }
+ .gs-carousel { width: 100%; }
+}
+@container (max-width: 699px) {
+ .gs-copy { order: -1; max-width: 600px; width: 100%; }
+ .gs-workflow-card { padding: 16px 12px; border-radius: 20px; }
+}
+@media (min-width: 1024px) { body { height: auto; } main { height: auto; } .gs-panel { height: auto; } }
+@media (max-width: 639px) { .gs-stage { padding: 20px; } }
+@media (min-width: 1024px) { .gs-copy h3 { font-size: 36px; } .gs-copy p { font-size: 18px; } }
+@media (min-width: 1024px) and (max-height: 760px) { .gs-copy h3 { font-size: 30px; } .gs-copy p { font-size: 15px; } }
+@media (min-width: 640px) { .gs-copy .gs-cta { min-height: 63px; padding-inline: 24px; font-size: 20px; } .gs-cta svg { width: 24px; height: 24px; } }
+
+/* Six-second illustration loops, with time to read each completed state. */
+@media (prefers-reduced-motion: no-preference) {
+ .gs-panel.is-active .gs-graphic,
+ .gs-panel.is-active .gs-carousel { animation: gs-graphic-arrive 650ms cubic-bezier(.2,.7,.2,1) both; }
+ .gs-panel.is-active .gs-motion-emphasis { transform-box: fill-box; transform-origin: center; animation: gs-control-emphasis 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-reveal { animation: gs-detail-arrive 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-later { animation-delay: 0ms; }
+ .gs-panel.is-active .gs-motion-target { animation: gs-target-settle 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-pencil { animation: gs-pencil-explore 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-hover-image { animation: gs-hover-image 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-hover-copy { animation: gs-hover-copy 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-note-appear { animation: gs-detail-arrive 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-library-hover { animation: gs-library-hover 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-menu-open { transform-box: fill-box; transform-origin: 55% 0%; animation: gs-menu-open 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-pin-press { transform-box: fill-box; transform-origin: center; animation: gs-pin-press 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-pinned-toolbar-icon { transform-box: fill-box; transform-origin: center; animation: gs-pinned-appear 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-folder-typing { animation: gs-folder-type 6000ms steps(6, end) infinite both; }
+ .gs-panel.is-active .gs-folder-caret { animation: gs-folder-caret 6000ms linear infinite both; }
+ .gs-panel.is-active .gs-folder-selection { animation: gs-folder-select 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-folder-note { animation: gs-folder-note-color 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-folder-target { animation: gs-folder-target-color 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-folder-color { transform-box: fill-box; transform-origin: center; animation: gs-folder-color 6000ms ease-in-out infinite both; }
+}
+@keyframes gs-folder-type {
+ 0%, 20%, 100% { clip-path: inset(0 100% 0 0); }
+ 40%, 95% { clip-path: inset(0 0 0 0); }
+}
+@keyframes gs-folder-caret {
+ 0%, 20% { translate: -46px 0; }
+ 40%, 100% { translate: 0 0; }
+}
+@keyframes gs-folder-select {
+ 0%, 44%, 100% { opacity: 0; }
+ 50%, 95% { opacity: 1; }
+}
+@keyframes gs-folder-note-color {
+ 0%, 44%, 100% { fill: #f7f7f5; }
+ 50%, 95% { fill: #bce5fe; }
+}
+@keyframes gs-folder-target-color {
+ 0%, 44%, 100% { fill: #37352f; fill-opacity: .08; stroke: #898985; }
+ 50%, 95% { fill: #bce5fe; fill-opacity: .18; stroke: #bce5fe; }
+}
+@keyframes gs-folder-color {
+ 0%, 42%, 54%, 100% { scale: 1; }
+ 47% { scale: .88; }
+}
+@keyframes gs-pin-press {
+ 0%, 10%, 19%, 100% { scale: 1; }
+ 14% { scale: .86; }
+}
+@keyframes gs-pinned-appear {
+ 0%, 18% { opacity: 0; translate: 60px 0; }
+ 28%, 92% { opacity: 1; translate: 0 0; }
+ 100% { opacity: 0; translate: 0 0; }
+}
+@keyframes gs-menu-open {
+ 0%, 7%, 100% { opacity: 0; translate: 0 -8px; scale: .96; }
+ 18%, 90% { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes gs-library-hover {
+ 0%, 24%, 85%, 100% { opacity: 0; }
+ 34%, 72% { opacity: 1; }
+}
+@keyframes gs-graphic-arrive {
+ from { opacity: 0; translate: 0 10px; }
+ to { opacity: 1; translate: 0 0; }
+}
+@keyframes gs-detail-arrive {
+ 0%, 8%, 100% { opacity: 0; translate: 0 5px; }
+ 20%, 92% { opacity: 1; translate: 0 0; }
+}
+@keyframes gs-control-emphasis {
+ 0%, 10%, 30%, 100% { scale: 1; }
+ 20% { scale: 1.07; }
+}
+@keyframes gs-target-settle {
+ 0%, 30%, 100% { opacity: 0; }
+ 40%, 90% { opacity: 1; }
+}
+@keyframes gs-pencil-explore {
+ 0%, 9%, 100% { translate: -120px 135px; }
+ 17%, 23% { translate: -35px 40px; }
+ 34%, 90% { translate: 0 0; }
+}
+@keyframes gs-hover-image {
+ 0%, 9%, 100% { opacity: 1; }
+ 14%, 95% { opacity: 0; }
+}
+@keyframes gs-hover-copy {
+ 0%, 13%, 29%, 100% { opacity: 0; }
+ 17%, 23% { opacity: 1; }
 }

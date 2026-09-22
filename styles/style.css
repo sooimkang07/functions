@@ -1,5 +1,11 @@
 @import url("tokens.css");
 
+/* Keep all panel text at least as large as the empty-state paragraph. */
+.notate-popup {
+	--notate-font-min: var(--fs-regular);
+	--fs-sm: var(--notate-font-min);
+}
+
 /* Restored system guide, above the library header. */
 .notate-popup .notate-pin-reminder { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; margin: 12px 12px 8px; padding: 12px; border: var(--border-ui); border-radius: var(--radius-md); background: var(--notate-color-guide); color: var(--color-text); font-family: var(--font-ui); }
 .notate-popup .notate-pin-reminder[hidden] { display: none; }
@@ -8,7 +14,7 @@
 .notate-popup .notate-pin-inline { width: 16px; height: 16px; vertical-align: -3px; }
 .notate-popup .notate-pin-reminder strong { font-size: var(--fs-regular); font-weight: var(--fw-medium); line-height: 1.45; }
 .notate-popup .notate-pin-reminder p { grid-column: 1; grid-row: 2; align-self: center; margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--color-text-secondary); }
-.notate-popup .notate-pin-reminder button { grid-column: 2; grid-row: 2; justify-self: end; align-self: center; padding: 4px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-secondary); font: inherit; font-size: var(--fs-sm); line-height: 1.45; white-space: nowrap; cursor: pointer; }
+.notate-popup .notate-pin-reminder button { grid-column: 2; grid-row: 2; justify-self: end; align-self: center; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-secondary); font: inherit; font-size: var(--fs-sm); line-height: 1.45; white-space: nowrap; cursor: pointer; }
 .notate-popup .notate-pin-reminder button:hover { background: var(--color-hover); color: var(--color-text); }
 .notate-popup .notate-pin-reminder button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .notate-popup .notate-pin-reminder-arrow { grid-column: 2; grid-row: 1; justify-self: end; width: 20px; height: 20px; color: var(--color-text-secondary); animation: notate-pin-arrow-up 1.4s ease-in-out infinite; }
@@ -1029,4 +1035,4 @@ menu#group-tabs { scrollbar-width: none; }
  font-weight: var(--fw-medium);
 }
 
-.popup-tour-link { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--color-text); text-underline-offset: 3px; }
+.popup-tour-link { display: inline-block; margin-top: 8px; font-size: var(--fs-sm); color: var(--color-text); text-underline-offset: 3px; }

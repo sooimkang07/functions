@@ -38,7 +38,6 @@ setupSync = notateSetupSync('welcome', event => {
  if (event.type === 'first-note-saved') {
   completed.add(3)
   startGuidePending = false
-  document.querySelector('#tour-finished').hidden = false
   setupNotice.textContent = 'Your note is saved. You can close the page and return to it from the Notate sidebar anytime.'
   showStep(step)
  }
@@ -104,7 +103,121 @@ getStarted.onclick = async () => {
 
 showStep(1)
 
+// Keep pagination in sync with both button navigation and touch/trackpad scrolling.
+const workflowCards = document.querySelector('#workflow-cards')
+const workflowDots = [...document.querySelectorAll('[data-workflow-slide]')]
+workflowDots.forEach((button, index) => button.addEventListener('click', () => {
+ const card = workflowCards.children[index]
+ workflowCards.scrollTo({ left: card.offsetLeft - workflowCards.children[0].offsetLeft,
+  behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+}))
+workflowCards.addEventListener('scroll', () => {
+ const first = workflowCards.children[0]
+ const second = workflowCards.children[1]
+ const index = workflowCards.scrollLeft > (second.offsetLeft - first.offsetLeft) / 2 ? 1 : 0
+ workflowDots.forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)))
+}, { passive: true })
+
+// Slow automatic paging; manual interaction always takes priority.
+const carousel = workflowCards.closest('.gs-carousel')
+const reducedCarouselMotion = matchMedia('(prefers-reduced-motion: reduce)')
+let carouselFrame = 0
+let carouselResumeAt = performance.now() + 6000
+let carouselDirection = 1
+const stopCarousel = () => {
+ cancelAnimationFrame(carouselFrame)
+ carouselFrame = 0
+ workflowCards.classList.remove('is-auto-sliding')
+ carouselResumeAt = performance.now() + 6000
+}
+const carouselPaused = () => reducedCarouselMotion.matches || document.hidden ||
+ !workflowCards.getClientRects().length || carousel.matches(':hover, :focus-within')
+const slideCarousel = () => {
+ if (carouselPaused() || performance.now() < carouselResumeAt || carouselFrame) return
+ const from = workflowCards.scrollLeft
+ const maximum = workflowCards.scrollWidth - workflowCards.clientWidth
+ if (maximum <= 0) return
+ if (from >= maximum - 1) carouselDirection = -1
+ else if (from <= 1) carouselDirection = 1
+ const to = carouselDirection > 0 ? maximum : 0
+ const started = performance.now()
+ workflowCards.classList.add('is-auto-sliding')
+ const animate = now => {
+  if (carouselPaused()) { stopCarousel(); return }
+  const progress = Math.min((now - started) / 700, 1)
+  const eased = (1 - Math.cos(Math.PI * progress)) / 2
+  workflowCards.scrollLeft = from + (to - from) * eased
+  if (progress < 1) carouselFrame = requestAnimationFrame(animate)
+  else {
+   carouselFrame = 0
+   carouselDirection *= -1
+   workflowCards.classList.remove('is-auto-sliding')
+   carouselResumeAt = performance.now() + 6000
+  }
+ }
+ carouselFrame = requestAnimationFrame(animate)
+}
+for (const event of ['pointerenter', 'pointerdown', 'wheel', 'focusin', 'keydown']) {
+ carousel.addEventListener(event, stopCarousel, { passive: true })
+}
+reducedCarouselMotion.addEventListener('change', stopCarousel)
+document.addEventListener('visibilitychange', stopCarousel)
+// Start the hold when the slide is actually visible, including returning to this step.
+const carouselVisibility = new IntersectionObserver(entries => {
+ if (entries.some(entry => entry.isIntersecting)) stopCarousel()
+})
+carouselVisibility.observe(workflowCards)
+const carouselTimer = setInterval(slideCarousel, 100)
+window.addEventListener('pagehide', () => {
+ stopCarousel()
+ clearInterval(carouselTimer)
+ carouselVisibility.disconnect()
+ reducedCarouselMotion.removeEventListener('change', stopCarousel)
+ document.removeEventListener('visibilitychange', stopCarousel)
+}, { once: true })
+
 // This isolated exercise never reads or writes the user's note library.
+const typedNote = document.querySelector('.gs-typed-note')
+const typingCard = typedNote.closest('.gs-workflow-card')
+const typingLines = [...typedNote.querySelectorAll('tspan')]
+const typingCopy = typingLines.map(line => line.textContent)
+const typingCaret = typingCard.querySelector('.gs-typing-caret')
+const savedHover = typingCard.querySelector('.gs-saved-note-hover')
+let typingFrame = 0
+const restoreTyping = () => {
+ cancelAnimationFrame(typingFrame)
+ typingLines.forEach((line, i) => { line.textContent = typingCopy[i] })
+ typingCaret.style.opacity = '1'
+ savedHover.style.opacity = '0'
+}
+const typingObserver = new IntersectionObserver(entries => {
+ restoreTyping()
+ if (!entries[0].isIntersecting || entries[0].intersectionRatio < .85 || reducedCarouselMotion.matches) return
+ const started = performance.now()
+ const length = typingCopy.join('').length
+ const type = now => {
+  const elapsed = (now - started) % 6000
+  let count = Math.floor(Math.max(0, elapsed - 200) / 28)
+  typingLines.forEach((line, i) => {
+   line.textContent = typingCopy[i].slice(0, Math.max(0, count))
+   count -= typingCopy[i].length
+  })
+  const done = elapsed > 200 + length * 28
+  typingCaret.style.opacity = done ? '1' : '0'
+  const hoverProgress = (elapsed - (400 + length * 28)) / 250
+  savedHover.style.opacity = String(Math.max(0, Math.min(1, hoverProgress)))
+  typingFrame = requestAnimationFrame(type)
+ }
+ typingFrame = requestAnimationFrame(type)
+}, { threshold: .85 })
+typingObserver.observe(typingCard)
+reducedCarouselMotion.addEventListener('change', restoreTyping)
+window.addEventListener('pagehide', () => {
+ restoreTyping()
+ typingObserver.disconnect()
+ reducedCarouselMotion.removeEventListener('change', restoreTyping)
+}, { once: true })
+
 const practice = document.querySelector('#practice')
 const target = document.querySelector('#practice-target')
 const composer = document.querySelector('#practice-composer')

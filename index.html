@@ -18,7 +18,7 @@
 	
 	<body class="notate-popup">
 		<div class="notate-pin-reminder" id="notate-pin-reminder" role="status" hidden>
-			<div class="notate-pin-reminder-copy"><strong>Press <svg class="notate-pin-inline" viewBox="0 0 24 24" aria-label="pin"><g transform="rotate(45 12 12)"><path d="M9 3h6v3l-1 1v4l3 4H7l3-4V7L9 6Z M12 15v7"/></g></svg> to keep Notate in your bar</strong><p>Access your notes from any tab.</p><button type="button" id="dismiss-pin-reminder">Not now</button></div>
+			<div class="notate-pin-reminder-copy"><strong>Press <svg class="notate-pin-inline" viewBox="0 0 24 24" aria-label="pin"><g transform="rotate(45 12 12)"><path d="M9 3h6v3l-1 1v4l3 4H7l3-4V7L9 6Z M12 15v7"/></g></svg> to keep Notate in your&nbsp;bar</strong><p>Access your notes from any tab.</p><button type="button" id="dismiss-pin-reminder">Not now</button></div>
 			<svg class="notate-pin-reminder-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4m-6 6 6-6 6 6"/></svg>
 		</div>
 		<header class="popup-header">
@@ -31,6 +31,10 @@
 				New
 			</button>
 		</header>
+		<div id="notate-start-reminder" class="notate-pin-reminder" role="status" hidden>
+			<div class="notate-pin-reminder-copy"><strong>Click New to add your first&nbsp;note</strong><p>Choose an element on the page to annotate.</p><button type="button" id="notate-start-dismiss">Not now</button></div>
+			<svg class="notate-pin-reminder-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4m-6 6 6-6 6 6"/></svg>
+		</div>
 
 
 		<main>

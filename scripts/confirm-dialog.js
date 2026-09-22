@@ -16,7 +16,7 @@
 			h2 { margin:0 0 8px; font-size:14px; font-weight:600; }
 			p { margin:0 0 20px; color:#68665f; }
 			form { display:flex; gap:8px; justify-content:flex-end; }
-			button { padding:6px 10px; border:0; border-radius:4px; font:500 12px/1.3 system-ui; cursor:pointer; background:transparent; color:#37352f; }
+			button { padding:6px 10px; border:0; border-radius:4px; font:500 var(--notate-font-min, 12px)/1.3 system-ui; cursor:pointer; background:transparent; color:#37352f; }
 			button[value=confirm] { background:#a33632; color:white; }
 			button[value=cancel]:hover { background:rgba(55,53,47,.08); }
 			button[value=cancel]:active { background:rgba(55,53,47,.12); }
