@@ -176,6 +176,8 @@ h1 { margin: 0; font-size: clamp(32px,5.6vw,64px); line-height: 1; }
  .gs-panel.is-active .gs-folder-note { animation: gs-folder-note-color 6000ms ease-in-out infinite both; }
  .gs-panel.is-active .gs-folder-target { animation: gs-folder-target-color 6000ms ease-in-out infinite both; }
  .gs-panel.is-active .gs-folder-color { transform-box: fill-box; transform-origin: center; animation: gs-folder-color 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-saved-note-hover { animation: gs-saved-note-hover 6000ms ease-in-out infinite both; }
+ .gs-panel.is-active .gs-motion-pointer { animation: gs-pointer-hover 6000ms ease-in-out infinite both; }
 }
 @keyframes gs-folder-type {
  0%, 20%, 100% { clip-path: inset(0 100% 0 0); }
@@ -246,4 +248,14 @@ h1 { margin: 0; font-size: clamp(32px,5.6vw,64px); line-height: 1; }
 @keyframes gs-hover-copy {
  0%, 13%, 29%, 100% { opacity: 0; }
  17%, 23% { opacity: 1; }
+}
+@keyframes gs-saved-note-hover {
+ 0%, 28%, 92%, 100% { opacity: 0; }
+ 38%, 82% { opacity: 1; }
+}
+@keyframes gs-pointer-hover {
+ 0%, 18%, 100% { opacity: 0; translate: 42px 36px; }
+ 28% { opacity: 1; translate: 12px 10px; }
+ 38%, 82% { opacity: 1; translate: 0 0; }
+ 92% { opacity: 0; translate: 0 0; }
 }

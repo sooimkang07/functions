@@ -182,13 +182,11 @@ const typingCard = typedNote.closest('.gs-workflow-card')
 const typingLines = [...typedNote.querySelectorAll('tspan')]
 const typingCopy = typingLines.map(line => line.textContent)
 const typingCaret = typingCard.querySelector('.gs-typing-caret')
-const savedHover = typingCard.querySelector('.gs-saved-note-hover')
 let typingFrame = 0
 const restoreTyping = () => {
  cancelAnimationFrame(typingFrame)
  typingLines.forEach((line, i) => { line.textContent = typingCopy[i] })
  typingCaret.style.opacity = '1'
- savedHover.style.opacity = '0'
 }
 const typingObserver = new IntersectionObserver(entries => {
  restoreTyping()
@@ -202,10 +200,7 @@ const typingObserver = new IntersectionObserver(entries => {
    line.textContent = typingCopy[i].slice(0, Math.max(0, count))
    count -= typingCopy[i].length
   })
-  const done = elapsed > 200 + length * 28
-  typingCaret.style.opacity = done ? '1' : '0'
-  const hoverProgress = (elapsed - (400 + length * 28)) / 250
-  savedHover.style.opacity = String(Math.max(0, Math.min(1, hoverProgress)))
+  typingCaret.style.opacity = elapsed > 200 + length * 28 ? '1' : '0'
   typingFrame = requestAnimationFrame(type)
  }
  typingFrame = requestAnimationFrame(type)
